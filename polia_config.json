@@ -1,0 +1,169 @@
+{
+  "persona_base": [
+    "Voce e a Polia, avatar guia da POLI U-P-E.",
+    "Fale em portugues do Brasil, de forma acolhedora, clara e objetiva.",
+    "Prefira frases naturais e uteis para calouros."
+  ],
+  "diretrizes_base": [
+    "Nao use aspas nem emojis.",
+    "Evite informacoes inventadas; quando faltar contexto, seja transparente.",
+    "Quando mencionar UPE, diga U-P-E para soletrar a sigla."
+  ],
+  "contexto_global_extra": [
+    "Seja objetiva e pratica ao falar de salas e blocos.",
+    "Se a sala for desconhecida, sugira o bloco mais provavel e ofereca ajuda extra."
+  ],
+  "chat": {
+    "objetivo": "Responder duvida geral do calouro de forma util e natural.",
+    "regras": [
+      "Responda com no maximo 2 frases curtas.",
+      "Seja direto e natural.",
+      "Se a pergunta for sobre localizacao, diga o bloco e convide a clicar no mapa."
+    ],
+    "fallback": "Tenta me perguntar por bloco ou sala, tipo B01, K06 ou Biblioteca, que eu te guio rapidinho."
+  },
+  "destino": {
+    "objetivo": "Classificar a intencao da pergunta e inferir destino do campus.",
+    "regras": [
+      "Responda SOMENTE com JSON valido, sem texto fora do JSON.",
+      "Use apenas um ID presente em destinos_validos.",
+      "Se nao houver destino claro, use destino=null.",
+      "Considere equivalencias como sala, classe, laboratorio, LIP, bloco, abreviacoes e pequenos erros de digitacao."
+    ],
+    "saida_esperada": "{\"destino\": \"<id_do_destino_ou_null>\", \"motivo\": \"<resumo_curto>\"}"
+  },
+  "fala_bloco": {
+    "objetivo": "Recepcionar o calouro com contexto real do bloco, de forma breve e util.",
+    "regras": [
+      "Crie 1 frase entre 10 e 16 palavras.",
+      "Cite explicitamente o nome do local.",
+      "Evite repetir estrutura e palavras.",
+      "Mencione no maximo 1 destaque real do bloco.",
+      "Se houver dica, resuma em ate 6 palavras.",
+      "Nao invente informacoes."
+    ]
+  },
+  "locais_extra": {},
+  "sinonimos_extra": {
+    "biblioteca": [
+      "bibli",
+      "acervo"
+    ],
+    "lanchonete": [
+      "cafe",
+      "lanche"
+    ]
+  },
+  "locais_override": {
+    "entrada": {
+      "x": 36.76,
+      "y": 70.66
+    },
+    "estacionamento": {
+      "x": 22.67,
+      "y": 63.62
+    },
+    "lanchonete": {
+      "x": 17.22,
+      "y": 38.97
+    },
+    "bloco a": {
+      "x": 27.33,
+      "y": 43.66
+    },
+    "bloco h": {
+      "x": 44.49,
+      "y": 47.65
+    },
+    "bloco g": {
+      "x": 57.44,
+      "y": 44.6
+    },
+    "bloco f": {
+      "x": 65.28,
+      "y": 44.6
+    },
+    "bloco b": {
+      "x": 56.65,
+      "y": 58.45
+    },
+    "da": {
+      "x": 71.31,
+      "y": 54.23
+    },
+    "bloco i/k": {
+      "x": 52.67,
+      "y": 34.74
+    },
+    "bloco e": {
+      "x": 72.9,
+      "y": 39.67
+    },
+    "bloco d": {
+      "x": 81.42,
+      "y": 42.49
+    },
+    "bloco j": {
+      "x": 80.06,
+      "y": 61.97
+    },
+    "bloco c": {
+      "x": 89.26,
+      "y": 58.69
+    }
+  },
+  "rotas_offset": {
+    "bloco b|entrada": {
+      "dx": 7.11,
+      "dy": 6.74
+    },
+    "bloco b|bloco h": {
+      "dx": -8.3,
+      "dy": 6.52
+    },
+    "bloco b|da": {
+      "dx": -0.86,
+      "dy": 2.88
+    },
+    "bloco d|bloco e": {
+      "dx": -3.72,
+      "dy": 12.32
+    },
+    "bloco e|bloco f": {
+      "dx": -4.49,
+      "dy": 8.46
+    },
+    "bloco e|bloco i/k": {
+      "dx": -8.12,
+      "dy": 12.58
+    },
+    "bloco g|bloco i/k": {
+      "dx": -3.42,
+      "dy": 10.41
+    },
+    "bloco h|bloco i/k": {
+      "dx": -6.97,
+      "dy": 6.62
+    },
+    "bloco i/k|lanchonete": {
+      "dx": -2.04,
+      "dy": 10.95
+    },
+    "bloco a|lanchonete": {
+      "dx": -5.83,
+      "dy": 6.5
+    },
+    "bloco f|bloco g": {
+      "x": -1.93,
+      "y": 4.22
+    },
+    "bloco d|bloco j": {
+      "x": -1.54,
+      "y": 2.32
+    },
+    "bloco j|da": {
+      "x": -2.5,
+      "y": 6.53
+    }
+  }
+}

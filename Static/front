@@ -1,0 +1,2113 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mapa Interativo POLI UPE</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap');
+
+* {
+box-sizing: border-box;
+}
+
+:root {
+--ceu-top: #ff7eb6;
+--ceu-bottom: #ffe8f3;
+--painel: #c94887;
+--painel-escuro: #9f2f69;
+--texto-claro: #fff3fa;
+--botao-borda: #f5a8cb;
+--botao-cinza: #f1dce8;
+--botao-cinza-borda: #c799b0;
+--verde-top: #95e95b;
+--verde-bottom: #279f39;
+--verde-borda: #16702c;
+/* Posicao vertical do glow/anel atras do avatar - DESKTOP */
+--hero-glow-bottom-desktop: 110px;
+--hero-ring-bottom-desktop: 110px;
+/* Posicao vertical do glow/anel atras do avatar - MOBILE */
+--hero-glow-bottom-mobile: 58px;
+--hero-ring-bottom-mobile: 54px;
+}
+
+body {
+margin: 0;
+min-height: 100vh;
+font-family: "Nunito", "Segoe UI", sans-serif;
+background:
+radial-gradient(circle at 15% 8%, rgba(255, 255, 255, 0.72) 0, rgba(255, 255, 255, 0) 28%),
+radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.58) 0, rgba(255, 255, 255, 0) 24%),
+linear-gradient(180deg, var(--ceu-top) 0%, var(--ceu-bottom) 64%);
+display: flex;
+justify-content: center;
+color: #5b1b3f;
+padding: 14px;
+}
+
+.game-shell {
+width: min(920px, 100%);
+min-height: calc(100vh - 28px);
+border-radius: 26px;
+background: linear-gradient(180deg, rgba(255, 209, 231, 0.72), rgba(247, 160, 200, 0.62));
+border: 2px solid rgba(255, 255, 255, 0.68);
+box-shadow: 0 18px 44px rgba(117, 25, 74, 0.35);
+position: relative;
+overflow: hidden;
+display: flex;
+flex-direction: column;
+padding: 16px 16px 14px;
+}
+
+.topbar {
+display: block;
+align-items: center;
+margin-bottom: 8px;
+}
+
+.audio-gate {
+position: fixed;
+inset: 0;
+display: flex;
+align-items: center;
+justify-content: center;
+background: rgba(255, 237, 246, 0.92);
+backdrop-filter: blur(3px);
+z-index: 999;
+}
+
+.audio-gate[aria-hidden="true"] {
+display: none;
+}
+
+.audio-gate-card {
+background: rgba(255, 255, 255, 0.95);
+border: 2px solid #d98ab2;
+border-radius: 16px;
+padding: 16px 18px;
+box-shadow: 0 14px 28px rgba(117, 25, 74, 0.28);
+display: grid;
+gap: 12px;
+text-align: left;
+width: min(520px, 92vw);
+}
+
+.audio-gate-card strong {
+color: #8d235d;
+font-family: "Baloo 2", sans-serif;
+font-size: 1.1rem;
+text-align: center;
+}
+
+.audio-gate-actions {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px;
+}
+
+.audio-gate button {
+border: 2px solid #16702c;
+background: linear-gradient(180deg, var(--verde-top), var(--verde-bottom));
+color: #13361b;
+font-family: "Baloo 2", sans-serif;
+font-size: 1.05rem;
+font-weight: 800;
+padding: 12px 14px;
+border-radius: 12px;
+cursor: pointer;
+box-shadow: 0 10px 20px rgba(14, 49, 82, 0.28);
+}
+
+.audio-gate button.secondary {
+border-color: #c799b0;
+background: linear-gradient(180deg, #f7e8f1, #e6cddc);
+color: #5b1b3f;
+}
+
+.cadastro-step {
+display: none;
+gap: 10px;
+}
+
+.cadastro-step.is-active {
+display: grid;
+}
+
+.cadastro-field {
+display: grid;
+gap: 6px;
+}
+
+.cadastro-field label {
+font-weight: 700;
+color: #6d2850;
+}
+
+.cadastro-field input,
+.cadastro-field select {
+height: 42px;
+border-radius: 10px;
+border: 2px solid #d7a6c0;
+padding: 0 10px;
+font-family: "Nunito", sans-serif;
+font-size: 0.95rem;
+outline: none;
+}
+
+.cadastro-field input:focus,
+.cadastro-field select:focus {
+border-color: #ffe58c;
+box-shadow: 0 0 0 3px rgba(255, 229, 140, 0.26);
+}
+
+.cadastro-opcoes {
+display: grid;
+gap: 6px;
+font-size: 0.9rem;
+color: #6d2850;
+}
+
+.cadastro-opcoes label {
+display: flex;
+gap: 8px;
+align-items: center;
+}
+
+.brand {
+margin: 0;
+text-align: center;
+color: #8d235d;
+font-size: clamp(2rem, 5vw, 3.4rem);
+line-height: 1;
+letter-spacing: 1px;
+font-family: "Baloo 2", "Nunito", sans-serif;
+font-weight: 800;
+text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+.map-stage {
+position: relative;
+flex: 0 0 auto;
+min-height: 430px;
+height: clamp(400px, 64vh, 620px);
+border-radius: 22px;
+border: 2px solid #d98ab2;
+background: linear-gradient(180deg, #ffd6eb 0%, #ffeaf6 45%, #ffe3ef 100%);
+overflow: hidden;
+box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.4), 0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+#game-container {
+position: absolute;
+inset: 0;
+background: #ffeaf6;
+}
+
+#map-base {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+object-fit: fill;
+background: #ffeaf6;
+z-index: 1;
+pointer-events: none;
+}
+
+#trilhas-svg,
+#rota-svg {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+pointer-events: none;
+}
+
+#trilhas-svg {
+z-index: 2;
+}
+
+#rota-svg {
+z-index: 4;
+}
+
+.linha-trilha {
+display: none;
+}
+
+#checkpoints-layer {
+position: absolute;
+inset: 0;
+z-index: 6;
+}
+
+.checkpoint {
+position: absolute;
+width: 46px;
+height: 46px;
+transform: translate(-50%, -100%);
+border-radius: 50% 50% 50% 0;
+rotate: -45deg;
+cursor: pointer;
+background: radial-gradient(circle at 35% 35%, #eaf8ff, #93d9ff 62%, #5dbcf2);
+border: 2px solid #2f8dc0;
+box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+transition: transform 0.14s ease;
+display: flex;
+align-items: center;
+justify-content: center;
+animation: checkpointFloat 1.8s ease-in-out infinite;
+}
+
+.checkpoint.is-target {
+background: radial-gradient(circle at 35% 35%, #fff8d6, #ffd166 62%, #f4a261);
+border-color: #c97c2c;
+box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.45), 0 12px 22px rgba(0, 0, 0, 0.3);
+animation: checkpointPulse 1s ease-in-out infinite;
+transform: translate(-50%, -102%) scale(1.12);
+}
+
+.checkpoint:hover {
+transform: translate(-50%, -102%) scale(1.08);
+}
+
+.checkpoint span {
+rotate: 45deg;
+color: #0f4f70;
+font-family: "Baloo 2", sans-serif;
+font-size: 0.9rem;
+font-weight: 800;
+margin-top: 2px;
+}
+
+@keyframes checkpointFloat {
+0%, 100% { margin-top: 0; }
+50% { margin-top: -3px; }
+}
+
+@keyframes checkpointPulse {
+0%, 100% { transform: translate(-50%, -102%) scale(1.08); }
+50% { transform: translate(-50%, -104%) scale(1.18); }
+}
+
+#avatar-on-map {
+position: absolute !important;
+width: 74px;
+height: 74px;
+background-image: url('/static/idle1.png');
+background-size: contain;
+background-repeat: no-repeat;
+background-position: center;
+z-index: 8;
+transform: translate3d(-50%, -50%, 0);
+filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.35));
+transition: left 180ms linear, top 180ms linear;
+will-change: left, top;
+backface-visibility: hidden;
+-webkit-backface-visibility: hidden;
+}
+
+#avatar-on-map.is-walking {
+animation: avatarWalkBob 380ms ease-in-out infinite;
+}
+
+@keyframes avatarWalkBob {
+0%, 100% { transform: translate3d(-50%, -50%, 0); }
+50% { transform: translate3d(-50%, -54%, 0); }
+}
+
+.route-chip {
+position: relative;
+z-index: 1;
+background: rgba(255, 250, 230, 0.9);
+border: 1px solid rgba(89, 77, 16, 0.34);
+box-shadow: 0 7px 14px rgba(0, 0, 0, 0.22);
+border-radius: 14px;
+padding: 6px 12px;
+font-family: "Baloo 2", sans-serif;
+font-size: 1.05rem;
+font-weight: 700;
+color: #3f3509;
+text-align: center;
+max-width: 100%;
+}
+
+#mascot-container {
+display: grid;
+grid-template-rows: auto auto auto;
+gap: 10px;
+align-items: stretch;
+pointer-events: auto;
+}
+
+.cards-row-top {
+display: grid;
+grid-template-columns: 340px 1fr;
+gap: 14px;
+align-items: stretch;
+}
+
+.cards-row-mid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 14px;
+align-items: stretch;
+}
+
+.mascot-card {
+background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 235, 246, 0.94));
+border: 2px solid #d98ab2;
+border-radius: 16px;
+min-height: 220px;
+box-shadow: 0 10px 20px rgba(135, 34, 86, 0.22);
+position: relative;
+overflow: hidden;
+display: flex;
+align-items: center;
+justify-content: center;
+padding: 12px 8px;
+}
+
+.mascot-card::before {
+content: "";
+position: absolute;
+width: 232px;
+height: 232px;
+left: 50%;
+bottom: var(--hero-glow-bottom-desktop);
+transform: translateX(-50%);
+border-radius: 50%;
+background: radial-gradient(circle, rgba(255, 244, 171, 0.95) 0%, rgba(255, 214, 86, 0.55) 40%, rgba(255, 201, 45, 0) 72%);
+filter: blur(1px);
+animation: heroGlow 2.8s ease-in-out infinite;
+z-index: 0;
+}
+
+.mascot-card::after {
+content: "";
+position: absolute;
+width: 254px;
+height: 254px;
+left: 50%;
+bottom: var(--hero-ring-bottom-desktop);
+transform: translateX(-50%);
+border-radius: 50%;
+border: 2px dashed rgba(201, 72, 135, 0.35);
+animation: heroRing 8s linear infinite;
+z-index: 0;
+}
+
+/* Tamanho do avatar - DESKTOP */
+#polia-side-shell {
+width: 380px;
+height: 380px;
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 1;
+}
+
+#polia-side-mascot {
+width: 368px;
+height: 368px;
+object-fit: contain;
+filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.25));
+transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+animation: heroFloat 3s ease-in-out infinite;
+}
+
+@keyframes heroGlow {
+0%, 100% { opacity: 0.78; transform: translateX(-50%) scale(1); }
+50% { opacity: 1; transform: translateX(-50%) scale(1.06); }
+}
+
+@keyframes heroRing {
+from { transform: translateX(-50%) rotate(0deg); }
+to { transform: translateX(-50%) rotate(360deg); }
+}
+
+@keyframes heroFloat {
+0%, 100% { margin-bottom: 0; }
+50% { margin-bottom: 6px; }
+}
+
+.interactive-column {
+display: grid;
+grid-template-rows: auto auto;
+gap: 8px;
+pointer-events: auto;
+}
+
+.control-strip {
+margin-top: 0;
+margin-bottom: 10px;
+display: grid;
+gap: 10px;
+}
+
+#speech-bubble-mascot {
+background: linear-gradient(160deg, #fffdf4, #ffffff);
+border: 2px solid #d98ab2;
+border-radius: 14px;
+color: #6d2850;
+font-size: 0.9rem;
+font-weight: 700;
+line-height: 1.34;
+padding: 10px 12px;
+box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+opacity: 0;
+visibility: hidden;
+transform: translateY(5px) scale(0.99);
+transition: opacity 240ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 240ms;
+}
+
+#speech-bubble-mascot.is-visible {
+opacity: 1;
+visibility: visible;
+transform: translateY(0) scale(1);
+transition: opacity 240ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+}
+
+#polia-foto-balao {
+background: linear-gradient(160deg, #fffdf4, #ffffff);
+border: 2px solid #d98ab2;
+border-radius: 14px;
+box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+display: grid;
+gap: 8px;
+padding: 10px;
+min-height: 220px;
+}
+
+.polia-foto-placeholder {
+font-family: "Baloo 2", sans-serif;
+font-size: 0.9rem;
+font-weight: 700;
+color: #6d2850;
+opacity: 0.8;
+line-height: 1.25;
+display: grid;
+place-items: center;
+text-align: center;
+padding: 10px 8px;
+border-radius: 12px;
+border: 2px dashed rgba(201, 72, 135, 0.35);
+}
+
+#polia-foto-balao .polia-foto-topo,
+#polia-foto-balao #polia-foto-img {
+display: none;
+}
+
+#polia-foto-balao.is-visible .polia-foto-placeholder {
+display: none;
+}
+
+#polia-foto-balao.is-visible .polia-foto-topo {
+display: flex;
+}
+
+#polia-foto-balao.is-visible #polia-foto-img {
+display: block;
+}
+
+.polia-foto-topo {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 8px;
+}
+
+.polia-foto-caption {
+font-family: "Baloo 2", sans-serif;
+font-size: 0.86rem;
+font-weight: 700;
+color: #6d2850;
+}
+
+.polia-foto-fechar {
+border: 0;
+background: #f6d8e8;
+color: #6d2850;
+width: 28px;
+height: 28px;
+border-radius: 50%;
+cursor: pointer;
+font-weight: 800;
+line-height: 1;
+}
+
+#polia-foto-img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid #f0bfd7;
+}
+
+.hero-search-card {
+background: var(--painel);
+border: 2px solid #84c7ff;
+border-radius: 14px;
+padding: 10px;
+color: var(--texto-claro);
+box-shadow: 0 10px 16px rgba(14, 49, 82, 0.35);
+}
+
+.hero-search-card strong {
+display: block;
+margin-bottom: 8px;
+font-size: 1rem;
+line-height: 1.2;
+}
+
+.search-row {
+display: grid;
+grid-template-columns: 1fr auto;
+gap: 8px;
+}
+
+.search-help {
+margin-top: 8px;
+font-size: 0.82rem;
+line-height: 1.2;
+opacity: 0.92;
+}
+
+.hero-search-card input {
+min-width: 0;
+height: 44px;
+border-radius: 11px;
+border: 2px solid #adcff1;
+padding: 0 11px;
+font-size: 0.95rem;
+font-family: "Nunito", sans-serif;
+outline: none;
+}
+
+.hero-search-card input:focus {
+border-color: #ffe58c;
+box-shadow: 0 0 0 3px rgba(255, 229, 140, 0.26);
+}
+
+.hero-search-card button {
+height: 44px;
+border-radius: 11px;
+border: 2px solid var(--verde-borda);
+background: linear-gradient(180deg, var(--verde-top), var(--verde-bottom));
+color: #13361b;
+padding: 0 14px;
+font-size: 1.02rem;
+font-family: "Baloo 2", sans-serif;
+font-weight: 800;
+cursor: pointer;
+transition: transform 0.13s ease;
+}
+
+.hero-search-card button:hover {
+transform: translateY(-1px) scale(1.01);
+}
+
+.details-strip {
+margin-top: 10px;
+background: rgba(255, 255, 255, 0.86);
+border-radius: 13px;
+border: 1px solid rgba(38, 92, 146, 0.35);
+padding: 9px 11px;
+display: grid;
+gap: 4px;
+box-shadow: 0 6px 12px rgba(20, 72, 114, 0.16);
+}
+
+#titulo-bloco {
+margin: 0;
+font-family: "Baloo 2", sans-serif;
+color: #1d4f84;
+font-size: 1.05rem;
+}
+
+#salas-bloco {
+color: #285f93;
+font-size: 0.9rem;
+line-height: 1.3;
+max-height: 88px;
+overflow: auto;
+}
+
+@media (max-width: 820px) {
+body { padding: 8px; }
+.game-shell { min-height: calc(100vh - 16px); border-radius: 16px; padding: 10px; }
+.topbar { margin-bottom: 6px; }
+.map-stage { min-height: 420px; }
+#mascot-container { grid-template-rows: auto auto auto; gap: 7px; }
+.cards-row-top { grid-template-columns: 1fr; gap: 7px; }
+.cards-row-mid { grid-template-columns: 1fr; gap: 7px; }
+.mascot-card { min-height: 210px; }
+#polia-side-shell { width: 290px; height: 290px; }
+#polia-side-mascot { width: 276px; height: 276px; }
+.mascot-card::before { width: 144px; height: 144px; bottom: var(--hero-glow-bottom-mobile); }
+.mascot-card::after { width: 160px; height: 160px; bottom: var(--hero-ring-bottom-mobile); }
+.hero-search-card strong { font-size: 0.94rem; }
+.search-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="cadastro-gate" class="audio-gate" aria-hidden="false">
+<div class="audio-gate-card">
+<strong>Cadastro rápido da Polia</strong>
+<form id="cadastro-form">
+<div id="cadastro-step-1" class="cadastro-step is-active">
+<div class="cadastro-field">
+<label>Você tem e-mail institucional?</label>
+<div class="cadastro-opcoes">
+<label><input type="radio" name="emailStatus" value="nao_quero" checked> Não quero informar ou não tenho</label>
+<label><input type="radio" name="emailStatus" value="sim"> Sim, meu e-mail é:</label>
+</div>
+<input id="cadastro-email" type="email" placeholder="Ex: seu.nome@upe.br" disabled />
+</div>
+<div class="audio-gate-actions">
+<button id="cadastro-avancar" type="button">Continuar</button>
+</div>
+</div>
+
+<div id="cadastro-step-2" class="cadastro-step">
+<div class="cadastro-field">
+<label>Nome completo</label>
+<input id="cadastro-nome" type="text" placeholder="Seu nome" />
+</div>
+<div class="cadastro-field">
+<label>Curso</label>
+<select id="cadastro-curso">
+<option value="" selected>Selecione seu curso</option>
+<optgroup label="Graduação">
+<option value="Física de Materiais">Física de Materiais</option>
+<option value="Engenharia Elétrica Eletrônica">Engenharia Elétrica Eletrônica</option>
+<option value="Engenharia Elétrica Eletrotécnica">Engenharia Elétrica Eletrotécnica</option>
+<option value="Engenharia Elétrica de Telecomunicações">Engenharia Elétrica de Telecomunicações</option>
+<option value="Engenharia Civil">Engenharia Civil</option>
+<option value="Engenharia Mecânica">Engenharia Mecânica</option>
+<option value="Engenharia da Computação">Engenharia da Computação</option>
+<option value="Engenharia de Controle e Automação">Engenharia de Controle e Automação</option>
+</optgroup>
+<optgroup label="Pós-graduação">
+<option value="Engenharia de Segurança do Trabalho">Engenharia de Segurança do Trabalho</option>
+<option value="Inteligência Artificial">Inteligência Artificial</option>
+<option value="Ciência dos Dados e Analytics">Ciência dos Dados e Analytics</option>
+<option value="Tecnologia e Gestão na Construção de Edificios">Tecnologia e Gestão na Construção de Edificios</option>
+<option value="Inspeção, Manutenção e Recuperação de Estruturas">Inspeção, Manutenção e Recuperação de Estruturas</option>
+<option value="Engenharia da Computação (Pós)">Engenharia da Computação (Pós)</option>
+<option value="Engenharia de Sistemas">Engenharia de Sistemas</option>
+<option value="Engenharia Civil (Pós)">Engenharia Civil (Pós)</option>
+</optgroup>
+<option value="nao_estudante">Não sou estudante</option>
+</select>
+</div>
+<div class="cadastro-field" id="cadastro-funcao-field" style="display:none;">
+<label>Se não for estudante, qual sua função?</label>
+<input id="cadastro-funcao" type="text" placeholder="Ex: visitante, professor, técnico" />
+</div>
+<div class="audio-gate-actions">
+<button id="cadastro-voltar" class="secondary" type="button">Voltar</button>
+<button id="cadastro-iniciar" type="submit">Iniciar</button>
+</div>
+</div>
+</form>
+<div class="audio-gate-actions" style="margin-top: 6px;">
+<button id="cadastro-limpar" class="secondary" type="button">Trocar cadastro</button>
+</div>
+</div>
+</div>
+
+<div class="game-shell">
+<header class="topbar">
+<h1 class="brand">UPE</h1>
+</header>
+
+<section class="control-strip">
+<div id="mascot-container">
+<div class="cards-row-top">
+<div class="mascot-card">
+<div id="polia-side-shell">
+<img id="polia-side-mascot" src="/static/frames/frame_0001.png" alt="Mascote Polia" />
+</div>
+</div>
+
+<div id="polia-foto-balao" aria-hidden="true">
+<div id="polia-foto-placeholder" class="polia-foto-placeholder">A foto do destino vai aparecer aqui.</div>
+<div class="polia-foto-topo">
+<span id="polia-foto-caption" class="polia-foto-caption">Foto do bloco</span>
+<button id="polia-foto-fechar" class="polia-foto-fechar" type="button" aria-label="Fechar foto">×</button>
+</div>
+<img id="polia-foto-img" src="" alt="Foto do bloco" loading="lazy" />
+</div>
+</div>
+
+<div id="speech-bubble-mascot">Bem-vindo à POLI! Sou a Polia.</div>
+
+<div class="cards-row-mid">
+<div class="hero-search-card">
+<strong>Buscar sala ou bloco</strong>
+<div class="search-row">
+<input type="text" id="input-pergunta" placeholder="Ex: K06, B01, Biblioteca" />
+<button id="btn-buscar" type="button">BUSCAR</button>
+</div>
+<div class="search-help">Opcional: diga onde está. Ex.: estou no bloco H. O destino você escolhe clicando no mapa.</div>
+</div>
+
+<div class="details-strip">
+<h2 id="titulo-bloco">INFO: ENTRADA</h2>
+<div id="salas-bloco">Clique num bloco para ver as salas.</div>
+</div>
+</div>
+</div>
+</section>
+
+<main class="map-stage">
+<div id="game-container">
+<img id="map-base" src="/static/mapa_poli_base.png" alt="Mapa do campus" />
+<svg id="trilhas-svg"></svg>
+<svg id="rota-svg">
+  </svg>
+<div id="checkpoints-layer"></div>
+<div id="avatar-on-map" style="left: 32%; top: 80%;"></div>
+</div>
+</main>
+</div>
+
+<script>
+const TEMPO_POR_TRECHO = 1400;
+const INTERVALO_PASSOS = 420;
+const ATIVAR_MOVIMENTO_CONTINUO = false;
+const USAR_TTS_API = true;
+const FORCAR_TTS_API = true;
+const USAR_VOZ_PADRAO_DO_SISTEMA = true;
+const VELOCIDADE_VOZ = 0.7; 
+const PITCH_VOZ = 2.5; 
+const VOZ_PREFERIDA = 'Luciana';
+const VOZ_ALTERNATIVAS = ['Luciana', 'Fernanda', 'Joana', 'Google português do Brasil'];
+const INTERVALO_IDLE_MIN = 900;
+const INTERVALO_IDLE_MAX = 1900;
+const BLINK_MIN = 2200;
+const BLINK_MAX = 5200;
+const AUDIO_START_DELAY_MS = 2500;
+
+// =========================
+// Ajustes rapidos de UI
+// (edite aqui para ir testando)
+// =========================
+const UI_TUNING = {
+  heroGlowBottomDesktop: 80,
+  heroRingBottomDesktop: 80,
+  heroGlowBottomMobile: 58,
+  heroRingBottomMobile: 70,
+};
+
+function aplicarAjustesUI() {
+  const root = document.documentElement;
+  root.style.setProperty('--hero-glow-bottom-desktop', `${UI_TUNING.heroGlowBottomDesktop}px`);
+  root.style.setProperty('--hero-ring-bottom-desktop', `${UI_TUNING.heroRingBottomDesktop}px`);
+  root.style.setProperty('--hero-glow-bottom-mobile', `${UI_TUNING.heroGlowBottomMobile}px`);
+  root.style.setProperty('--hero-ring-bottom-mobile', `${UI_TUNING.heroRingBottomMobile}px`);
+}
+
+// Expondo para testes via console (opcional):
+window.UI_TUNING = UI_TUNING;
+window.aplicarAjustesUI = aplicarAjustesUI;
+aplicarAjustesUI();
+
+const gameContainer = document.getElementById('game-container');
+const avatarOnMap = document.getElementById('avatar-on-map');
+const speechBubbleMascot = document.getElementById('speech-bubble-mascot');
+const inputPergunta = document.getElementById('input-pergunta');
+const btnBuscar = document.getElementById('btn-buscar');
+const tituloBloco = document.getElementById('titulo-bloco');
+const salasBloco = document.getElementById('salas-bloco');
+const poliaSideMascot = document.getElementById('polia-side-mascot');
+const poliaFotoBalao = document.getElementById('polia-foto-balao');
+const poliaFotoImg = document.getElementById('polia-foto-img');
+const poliaFotoCaption = document.getElementById('polia-foto-caption');
+const poliaFotoFechar = document.getElementById('polia-foto-fechar');
+const checkpointsLayer = document.getElementById('checkpoints-layer');
+const trilhasSvg = document.getElementById('trilhas-svg');
+const rotaSvg = document.getElementById('rota-svg');
+
+const AVATAR_MAPA_FRAMES = ['idle1.png', 'walk1.png', 'walk2.png'];
+const TOTAL_FRAMES = 160;
+const APRESENTACAO_INICIO = 0;
+const APRESENTACAO_FIM = 156;
+const RESPOSTA_INICIO = 49;
+const RESPOSTA_FIM = 146;
+
+const FOTOS_POR_BLOCO = {
+  "bloco a": { src: "/static/fotos%20blocos/Bloco%20A%20napsi.png", legenda: "Bloco A (NAPSI)" },
+  "bloco b": { src: "/static/fotos%20blocos/Bloco%20B.png", legenda: "Bloco B" },
+  "bloco c": { src: "/static/fotos%20blocos/Bloco-C.png", legenda: "Bloco C" },
+  "bloco e": { src: "/static/fotos%20blocos/Bloco%20E.png", legenda: "Bloco E" },
+  "bloco f": { src: "/static/fotos%20blocos/Bloco%20F.png", legenda: "Bloco F" },
+  "bloco g": { src: "/static/fotos%20blocos/Bloco%20G.png", legenda: "Bloco G" },
+  "bloco h": { src: "/static/fotos%20blocos/Bloco%20H.png", legenda: "Bloco H" },
+  "bloco i/k": { src: "/static/fotos%20blocos/bloco%20ik.png", legenda: "Bloco I/K" },
+  "bloco j": { src: "/static/fotos%20blocos/Bloco%20J.png", legenda: "Bloco J" },
+  "lanchonete": { src: "/static/fotos%20blocos/A-lanchonete.png", legenda: "Lanchonete" },
+  "praca-domino": { src: "/static/fotos%20blocos/Domin%C3%B3.png", legenda: "Praça do Dominó" }
+};
+
+const PONTO_DOMINO = { x: 72.78, y: 56.81, raioPx: 32 };
+
+const ALIASES_EXTRA_POR_LOCAL = {
+"bloco c": [
+"lab maker",
+"labmaker",
+"maker",
+"maker space",
+"space maker",
+"spacemaker",
+"laboratorio steam",
+"lab steam",
+"steam",
+"laboratorio steam acessibilidade",
+"steam acessibilidade",
+"laboratorio steam inclusao",
+"tempest aerodesign",
+"tempest",
+"aerodesign",
+"laboratorio combustivel",
+"lab combustivel",
+"lab de combustivel",
+"combustivel",
+],
+};
+
+function framePathFromIndex(indiceZeroBaseado) {
+  const indice = Math.max(0, Math.min(TOTAL_FRAMES - 1, indiceZeroBaseado));
+  const numero = String(indice + 1).padStart(4, '0');
+  return `frames/frame_${numero}.png`;
+}
+
+function montarSequenciaFrames(inicio, fim) {
+  const inicioSeguro = Math.max(0, inicio);
+  const fimSeguro = Math.min(TOTAL_FRAMES - 1, fim);
+  if (fimSeguro < inicioSeguro) return [];
+  return Array.from({ length: fimSeguro - inicioSeguro + 1 }, (_, idx) => framePathFromIndex(inicioSeguro + idx));
+}
+
+const FRAMES_APRESENTACAO = montarSequenciaFrames(APRESENTACAO_INICIO, APRESENTACAO_FIM);
+const FRAMES_RESPOSTA = montarSequenciaFrames(RESPOSTA_INICIO, RESPOSTA_FIM);
+const POSE_APRESENTACAO_FIM = framePathFromIndex(APRESENTACAO_FIM);
+const POSE_ESPERA = FRAMES_RESPOSTA[FRAMES_RESPOSTA.length - 1] || POSE_APRESENTACAO_FIM || framePathFromIndex(0);
+const avatarFramesCarregados = new Set();
+const apresentacaoFramesCarregados = new Set();
+const mascoteFramesCarregados = new Set();
+
+let avatarFrameAtual = 'idle1.png';
+let vozPolia = null;
+let poliaJaSeApresentou = false;
+let audioPoliaAtual = null;
+let audioPoliaUrlAtual = null;
+let falaTokenAtual = 0;
+let movimentoTokenAtual = 0;
+let apresentacaoTokenAtual = 0;
+let apresentacaoTimeout = null;
+let audioBloqueado = false;
+let audioPendencia = null;
+let introPendente = null;
+let audioAtivado = false;
+let bocaAnimacaoId = null;
+let perfilUsuario = null;
+let fotoPendenteId = null;
+
+const COOKIE_PERFIL = 'polia_cadastro';
+const COOKIE_DIAS = 180;
+const FRAME_PENSAR = framePathFromIndex(RESPOSTA_INICIO);
+const poseAjustes = {};
+let basePose = { scale: 1, x: 0, y: 0 };
+let microMovimento = { x: 0, y: 0, rot: 0, blinkY: 1 };
+
+function setMascotPose(frame) {
+  if (!mascoteFramesCarregados.has(frame)) return;
+  const ajuste = poseAjustes[frame] || { scale: 1.0, x: 0, y: 0 };
+  basePose = ajuste;
+  poliaSideMascot.src = `/static/${frame}`;
+  aplicarTransformMascote();
+}
+
+function tentarTocarAudio(audio) {
+  if (!audio) return;
+  audio.play().then(() => {
+    audioBloqueado = false;
+    audioPendencia = null;
+    if (introPendente) {
+      const textoIntro = introPendente;
+      introPendente = null;
+      configurarFalaAnimada(textoIntro, POSE_ESPERA, { apresentacao: true });
+    }
+  }).catch(() => {
+    audioBloqueado = true;
+    audioPendencia = audio;
+    if (!introPendente) {
+      atualizarBalao('Clique para ativar o audio.');
+    }
+  });
+}
+
+function prepararDesbloqueioAudio() {
+  const tentar = () => {
+    if (!audioPendencia) return;
+    tentarTocarAudio(audioPendencia);
+  };
+  ['click', 'keydown', 'touchstart'].forEach((evento) => {
+    document.addEventListener(evento, tentar, { once: true });
+  });
+}
+
+function aguardarFrameInicial(timeoutMs = 1500) {
+  const primeiro = framePathFromIndex(APRESENTACAO_INICIO);
+  if (apresentacaoFramesCarregados.has(primeiro)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const inicio = Date.now();
+    const timer = setInterval(() => {
+      if (apresentacaoFramesCarregados.has(primeiro) || Date.now() - inicio > timeoutMs) {
+        clearInterval(timer);
+        resolve(apresentacaoFramesCarregados.has(primeiro));
+      }
+    }, 60);
+  });
+}
+
+let locaisCache = {};
+let localAtual = 'entrada';
+let aliasesLocais = [];
+let talkTimeout, idleTimeout, blinkTimeout;
+const checkpointsPorId = {};
+let checkpointAlvoId = null;
+
+const conexoes = {
+  "entrada": ["estacionamento", "bloco b"], "estacionamento": ["entrada", "bloco a"], "lanchonete": ["bloco a", "bloco i/k"], "bloco a": ["estacionamento", "lanchonete", "bloco h"], "bloco h": ["bloco a", "bloco g", "bloco b", "bloco i/k"], "bloco g": ["bloco h", "bloco f", "bloco b", "bloco i/k"], "bloco f": ["bloco g", "da", "bloco b", "bloco e"], "bloco b": ["entrada", "bloco h", "bloco g", "bloco f", "da"], "da": ["bloco b", "bloco f", "bloco j"], "bloco i/k": ["lanchonete", "bloco e", "bloco h", "bloco g"], "bloco e": ["bloco i/k", "bloco d", "bloco f"], "bloco d": ["bloco e", "bloco j"], "bloco j": ["da", "bloco d", "bloco c"], "bloco c": ["bloco j"]
+};
+
+// =============================================== //
+
+function formatarNomeLocal(id) { return id.replace(/\b\w/g, l => l.toUpperCase()); }
+function abreviarLocal(id) {
+  const m = { "entrada": "IN", "estacionamento": "EST", "lanchonete": "LAN", "bloco a": "A", "bloco h": "H", "bloco g": "G", "bloco f": "F", "bloco b": "B", "da": "DA", "bloco i/k": "I/K", "bloco e": "E", "bloco d": "D", "bloco j": "J", "bloco c": "C" };
+  if (m[id]) return m[id];
+  if (id.startsWith('bloco ')) {
+    const sufixo = id.replace('bloco ', '').trim().toUpperCase();
+    return sufixo || 'BLO';
+  }
+  return id.slice(0, 3).toUpperCase();
+}
+
+function normalizarTexto(texto) {
+  return (texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function escaparRegExp(texto) {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function ocultarFotoLocal() {
+  if (!poliaFotoBalao) return;
+  poliaFotoBalao.classList.remove('is-visible');
+  poliaFotoBalao.setAttribute('aria-hidden', 'true');
+  if (poliaFotoImg) poliaFotoImg.src = '';
+  if (poliaFotoCaption) poliaFotoCaption.textContent = '';
+}
+
+function mostrarFotoLocal(destinoId) {
+  if (!poliaFotoBalao || !poliaFotoImg || !poliaFotoCaption) return;
+  const info = FOTOS_POR_BLOCO[destinoId];
+  if (!info || !info.src) return;
+  poliaFotoImg.src = info.src;
+  poliaFotoImg.alt = info.legenda || 'Foto do bloco';
+  poliaFotoCaption.textContent = info.legenda || 'Foto do bloco';
+  poliaFotoBalao.setAttribute('aria-hidden', 'false');
+  poliaFotoBalao.classList.add('is-visible');
+}
+
+function agendarFotoAposFala(destinoId) {
+  fotoPendenteId = destinoId || null;
+}
+
+function mostrarFotoPendente(destinoId) {
+  if (!fotoPendenteId || fotoPendenteId !== destinoId) return;
+  fotoPendenteId = null;
+  mostrarFotoLocal(destinoId);
+}
+
+function pontoDentroDoRaio(xPct, yPct, alvo, container) {
+  const xPx = (xPct / 100) * container.width;
+  const yPx = (yPct / 100) * container.height;
+  const alvoXPx = (alvo.x / 100) * container.width;
+  const alvoYPx = (alvo.y / 100) * container.height;
+  const dx = xPx - alvoXPx;
+  const dy = yPx - alvoYPx;
+  return Math.hypot(dx, dy) <= alvo.raioPx;
+}
+
+function acionarEasterEggDomino() {
+  ocultarFotoLocal();
+  agendarFotoAposFala('praca-domino');
+  configurarFalaAnimada('Você encontrou a Praça do Dominó!', POSE_ESPERA, {
+    onEnd: () => mostrarFotoPendente('praca-domino'),
+  });
+}
+
+function construirAliasesLocais() {
+  const aliasMap = new Map();
+  const adicionarAlias = (alias, id, minLen = 2) => {
+    if (!alias || alias.length < minLen) return;
+    const existentes = aliasMap.get(alias) || new Set();
+    existentes.add(id);
+    aliasMap.set(alias, existentes);
+  };
+  Object.keys(locaisCache).forEach((id) => {
+    const idNorm = normalizarTexto(id);
+    const opcoes = new Set([idNorm]);
+
+    if (idNorm.startsWith('bloco ')) {
+      const sufixo = idNorm.replace('bloco ', '').trim();
+      opcoes.add(`bloco ${sufixo}`);
+      if (sufixo === 'i/k') {
+        opcoes.add('bloco i');
+        opcoes.add('bloco k');
+        opcoes.add('ik');
+        opcoes.add('i k');
+      }
+    }
+
+    if (idNorm === 'entrada') {
+      opcoes.add('portao');
+      opcoes.add('portao principal');
+      opcoes.add('acesso principal');
+      opcoes.add('inicio');
+    }
+
+    if (idNorm === 'da') {
+      opcoes.add('diretorio academico');
+      opcoes.add('diretorio');
+    }
+
+    opcoes.forEach((alias) => {
+      adicionarAlias(alias, id, 2);
+    });
+
+    const salas = Array.isArray(locaisCache[id]?.salas) ? locaisCache[id].salas : [];
+    salas.forEach((sala) => {
+      const textoSala = String(sala || '');
+      textoSala.split(/[,;]+/).forEach((parte) => {
+        parte
+          .split(':')
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .forEach((segmento) => {
+            const alias = normalizarTexto(segmento);
+            adicionarAlias(alias, id, 3);
+          });
+      });
+    });
+  });
+
+  const aliases = [];
+  aliasMap.forEach((ids, alias) => {
+    if (ids.size === 1) {
+      aliases.push({ alias, id: Array.from(ids)[0] });
+    }
+  });
+
+  aliases.sort((a, b) => b.alias.length - a.alias.length);
+  return aliases;
+}
+
+function extrairLocaisMencionados(texto) {
+  const textoNorm = normalizarTexto(texto);
+  if (!textoNorm) return [];
+
+  const encontrados = [];
+  const jaAdicionados = new Set();
+
+  aliasesLocais.forEach(({ alias, id }) => {
+    const regex = new RegExp(`(^|\\s)${escaparRegExp(alias)}(?=\\s|$)`, 'g');
+    let match;
+    while ((match = regex.exec(textoNorm)) !== null) {
+      encontrados.push({ id, idx: match.index + (match[1] ? match[1].length : 0) });
+    }
+  });
+
+  encontrados.sort((a, b) => a.idx - b.idx);
+
+  const idsOrdenados = [];
+  encontrados.forEach(({ id }) => {
+    if (jaAdicionados.has(id)) return;
+    jaAdicionados.add(id);
+    idsOrdenados.push(id);
+  });
+
+  return idsOrdenados;
+}
+
+function construirMapaPrefixosBloco() {
+  const mapa = {};
+  Object.keys(locaisCache).forEach((id) => {
+    const nome = normalizarTexto(id);
+    if (!nome.startsWith('bloco ')) return;
+
+    const sufixo = nome.replace('bloco ', '').trim();
+    const partes = sufixo.split('/').map((p) => p.trim()).filter(Boolean);
+    partes.forEach((parte) => {
+      const letra = (parte || '')[0];
+      if (letra && /[a-z]/.test(letra)) {
+        mapa[letra] = id;
+      }
+    });
+  });
+  return mapa;
+}
+
+function construirMapaLipParaLocal() {
+  const mapa = {};
+  Object.entries(locaisCache).forEach(([id, dados]) => {
+    const salas = Array.isArray(dados?.salas) ? dados.salas : [];
+    salas.forEach((sala) => {
+      const match = String(sala || '').match(/\blip\s*-?\s*(\d{1,3})\b/i);
+      if (!match) return;
+      const numero = match[1].padStart(2, '0');
+      mapa[numero] = id;
+    });
+  });
+  return mapa;
+}
+
+function extrairLocaisPorSala(texto) {
+  const textoNorm = normalizarTexto(texto);
+  if (!textoNorm) return [];
+
+  const mapaPrefixos = construirMapaPrefixosBloco();
+  const mapaLip = construirMapaLipParaLocal();
+  const encontrados = [];
+  const regexBloco = /\bbloco\s+([a-z])\b/g;
+  let matchBloco;
+
+  while ((matchBloco = regexBloco.exec(textoNorm)) !== null) {
+    const letra = (matchBloco[1] || '').toLowerCase();
+    const localId = mapaPrefixos[letra];
+    if (!localId) continue;
+    encontrados.push({
+      id: localId,
+      idx: matchBloco.index,
+      score: 3,
+    });
+  }
+  const regexLip = /\blip\s*-?\s*(\d{1,3})\b/g;
+  let matchLip;
+
+  while ((matchLip = regexLip.exec(textoNorm)) !== null) {
+    const numero = String(matchLip[1] || '').padStart(2, '0');
+    const localId = mapaLip[numero];
+    if (!localId) continue;
+    encontrados.push({
+      id: localId,
+      idx: matchLip.index,
+      score: 3,
+    });
+  }
+  const regex = /\b([a-z]{1,4})\s*-?\s*(\d{1,3})\b/g;
+  let match;
+
+  while ((match = regex.exec(textoNorm)) !== null) {
+    const prefixo = (match[1] || '').toLowerCase();
+    const chave = prefixo[0];
+    const localId = mapaPrefixos[chave];
+    if (!localId) continue;
+
+    encontrados.push({
+      id: localId,
+      idx: match.index,
+      score: prefixo === chave ? 2 : 1,
+    });
+  }
+
+  if (!encontrados.length) return [];
+
+  encontrados.sort((a, b) => {
+    if (a.idx !== b.idx) return a.idx - b.idx;
+    return b.score - a.score;
+  });
+
+  const ordenados = [];
+  const vistos = new Set();
+  encontrados.forEach(({ id }) => {
+    if (vistos.has(id)) return;
+    vistos.add(id);
+    ordenados.push(id);
+  });
+
+  return ordenados;
+}
+
+function extrairReferenciasOrdenadas(texto) {
+  const locaisTexto = extrairLocaisMencionados(texto);
+  const locaisSala = extrairLocaisPorSala(texto);
+
+  const unificados = [];
+  const vistos = new Set();
+  for (const id of [...locaisTexto, ...locaisSala]) {
+    if (vistos.has(id)) continue;
+    vistos.add(id);
+    unificados.push(id);
+  }
+  return unificados;
+}
+
+function interpretarComandoRota(pergunta) {
+  const textoNorm = normalizarTexto(pergunta);
+  const locais = extrairReferenciasOrdenadas(pergunta);
+  if (!locais.length) return null;
+
+  const temIndicadorOrigem = /(\b(estou|estava|tava|to|tô|estamos|saindo|partindo|vindo)\b)/.test(textoNorm);
+  const temIndicadorDestino = /(\b(quero|queria|gostaria|preciso|vou|ir|indo|destino|ate|até|para|pra|pro)\b)/.test(textoNorm);
+
+  if (locais.length >= 2 && (temIndicadorOrigem || temIndicadorDestino)) {
+    return { origem: locais[0], destino: locais[locais.length - 1] };
+  }
+
+  if (temIndicadorOrigem) {
+    return { origem: locais[0] };
+  }
+
+  return null;
+}
+
+function ehDeclaracaoLocalizacao(pergunta) {
+  const textoNorm = normalizarTexto(pergunta);
+  return /(\b(estou|to|tô|estamos|me encontro|me localizo|fica onde eu estou|minha localizacao|minha localizacao atual|estou na sala|estou no bloco|estou na)\b)/.test(textoNorm);
+}
+
+function definirLocalAtual(destinoId, atualizarInfo = true) {
+  if (!locaisCache[destinoId]) return false;
+
+  localAtual = destinoId;
+  avatarOnMap.classList.remove('is-walking');
+  setFrameAvatarMapa('idle1.png');
+  avatarOnMap.style.left = locaisCache[destinoId].x + '%';
+  avatarOnMap.style.top = locaisCache[destinoId].y + '%';
+  
+  rotaSvg.innerHTML = ''; // Limpa as rotas visuais
+
+  if (atualizarInfo) {
+    tituloBloco.innerText = 'INFO: ' + formatarNomeLocal(destinoId).toUpperCase();
+    const salas = locaisCache[destinoId].salas || [];
+    salasBloco.innerHTML = salas.length ? '<strong>Salas:</strong><br>' + salas.join('<br>') : '';
+  }
+
+  return true;
+}
+
+function limparCheckpointAlvo() {
+  if (checkpointAlvoId && checkpointsPorId[checkpointAlvoId]) {
+    checkpointsPorId[checkpointAlvoId].classList.remove('is-target');
+  }
+  checkpointAlvoId = null;
+}
+
+function destacarCheckpoint(destinoId) {
+  if (!destinoId || !checkpointsPorId[destinoId]) return;
+  if (checkpointAlvoId && checkpointAlvoId !== destinoId) {
+    checkpointsPorId[checkpointAlvoId].classList.remove('is-target');
+  }
+  checkpointAlvoId = destinoId;
+  checkpointsPorId[destinoId].classList.add('is-target');
+}
+
+function atualizarInfoDestino(destinoId) {
+  if (!locaisCache[destinoId]) return;
+  tituloBloco.innerText = 'INFO: ' + formatarNomeLocal(destinoId).toUpperCase();
+  const salas = locaisCache[destinoId].salas || [];
+  salasBloco.innerHTML = salas.length ? '<strong>Salas:</strong><br>' + salas.join('<br>') : '';
+}
+
+function percentualParaPixel(x, y) {
+  const rect = document.getElementById('game-container').getBoundingClientRect();
+  return { x: (x / 100) * rect.width, y: (y / 100) * rect.height };
+}
+
+function preloadFramesAvatarMapa() {
+  AVATAR_MAPA_FRAMES.forEach((frame) => {
+    const img = new Image();
+    img.onload = () => avatarFramesCarregados.add(frame);
+    img.onerror = () => avatarFramesCarregados.add(frame);
+    img.src = `/static/${frame}`;
+  });
+}
+
+function preloadFramesApresentacao() {
+  [...FRAMES_APRESENTACAO, ...FRAMES_RESPOSTA].forEach((frame) => {
+    const img = new Image();
+    img.onload = () => {
+      apresentacaoFramesCarregados.add(frame);
+      mascoteFramesCarregados.add(frame);
+    };
+    img.onerror = () => {
+      apresentacaoFramesCarregados.add(frame);
+      mascoteFramesCarregados.add(frame);
+    };
+    img.src = `/static/${frame}`;
+  });
+}
+
+function aguardarFramesMascote(frames, minimo = 20, timeoutMs = 2000) {
+  const lista = Array.isArray(frames) && frames.length ? frames : FRAMES_RESPOSTA;
+  let carregados = 0;
+  lista.forEach((frame) => {
+    if (mascoteFramesCarregados.has(frame)) {
+      carregados += 1;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => mascoteFramesCarregados.add(frame);
+    img.onerror = () => mascoteFramesCarregados.add(frame);
+    img.src = `/static/${frame}`;
+  });
+
+  if (carregados >= minimo) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const inicio = Date.now();
+    const timer = setInterval(() => {
+      const total = lista.filter((f) => mascoteFramesCarregados.has(f)).length;
+      if (total >= minimo || Date.now() - inicio > timeoutMs) {
+        clearInterval(timer);
+        resolve(total >= minimo);
+      }
+    }, 80);
+  });
+}
+
+function setFrameAvatarMapa(frame) {
+  if (!avatarFramesCarregados.has(frame)) return;
+  avatarFrameAtual = frame;
+  avatarOnMap.style.backgroundImage = `url('/static/${frame}')`;
+}
+
+function iniciarAnimacaoApresentacao(token, duracaoMs = null) {
+  const sequencia = FRAMES_APRESENTACAO.length ? FRAMES_APRESENTACAO : [framePathFromIndex(0)];
+  const duracaoSegura = Number.isFinite(duracaoMs) && duracaoMs > 0 ? duracaoMs : sequencia.length * 95;
+  const intervaloMs = Math.max(45, Math.floor(duracaoSegura / Math.max(1, sequencia.length)));
+
+  apresentacaoTokenAtual = token;
+  clearTimeout(apresentacaoTimeout);
+
+  let indice = 0;
+  const avancar = () => {
+    if (token !== apresentacaoTokenAtual) return;
+    setMascotPose(sequencia[indice]);
+    indice += 1;
+    if (indice >= sequencia.length) {
+      apresentacaoTimeout = null;
+      return;
+    }
+    apresentacaoTimeout = setTimeout(avancar, intervaloMs);
+  };
+
+  avancar();
+}
+
+function pararAnimacaoApresentacao(poseFinal = POSE_ESPERA) {
+  clearTimeout(apresentacaoTimeout);
+  apresentacaoTimeout = null;
+  apresentacaoTokenAtual += 1;
+  setMascotPose(poseFinal);
+}
+
+function aplicarTransformMascote() {
+  poliaSideMascot.style.transform = `translate(${basePose.x + microMovimento.x}px, ${basePose.y + microMovimento.y}px) rotate(${microMovimento.rot}deg) scale(${basePose.scale}) scaleY(${microMovimento.blinkY})`;
+}
+
+function ajustarTextoTela(texto) {
+  const base = (texto || '').toString();
+  return base
+    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'UPE')
+    .replace(/\bPolía\b/gi, 'POLI')
+    .replace(/\bPolí\b/gi, 'POLI');
+}
+
+function ajustarTextoFala(texto) {
+  return (texto || '')
+    .toString()
+    .replace(/\bPolia\b/gi, 'Polía')
+    .replace(/\bPoli\b/gi, 'Polí')
+    .replace(/\bPOLI\b/g, 'Polí');
+}
+
+function atualizarBalao(texto) {
+  speechBubbleMascot.classList.remove('is-visible');
+  void speechBubbleMascot.offsetWidth;
+  speechBubbleMascot.innerText = ajustarTextoTela(texto);
+  speechBubbleMascot.classList.add('is-visible');
+}
+
+function iniciarAnimacaoBoca(texto, token, opcoes = {}) {
+  const frames = opcoes.frames || FRAMES_RESPOSTA;
+  const framesCarregados = frames.filter((frame) => mascoteFramesCarregados.has(frame));
+  if (framesCarregados.length < 8) {
+    setTimeout(() => {
+      if (token !== falaTokenAtual) return;
+      iniciarAnimacaoBoca(texto, token, opcoes);
+    }, 120);
+    return;
+  }
+  const intervaloBase = Number.isFinite(opcoes.intervaloMs) ? opcoes.intervaloMs : 120;
+  let curr = 0;
+  if (bocaAnimacaoId) {
+    cancelAnimationFrame(bocaAnimacaoId);
+  }
+  let ultimo = performance.now();
+  const intervalo = Math.max(60, intervaloBase);
+  const avancar = (agora) => {
+    if (token !== falaTokenAtual) return;
+    if (agora - ultimo >= intervalo) {
+      setMascotPose(framesCarregados[curr]);
+      curr = (curr + 1) % framesCarregados.length;
+      ultimo = agora;
+    }
+    bocaAnimacaoId = requestAnimationFrame(avancar);
+  };
+  bocaAnimacaoId = requestAnimationFrame(avancar);
+}
+
+function pararAnimacaoFala(poseFinal = POSE_ESPERA) {
+  clearTimeout(talkTimeout);
+  talkTimeout = null;
+  if (bocaAnimacaoId) {
+    cancelAnimationFrame(bocaAnimacaoId);
+    bocaAnimacaoId = null;
+  }
+  setMascotPose(poseFinal);
+}
+
+function selecionarVozPolia() {
+  if (USAR_VOZ_PADRAO_DO_SISTEMA) {
+    vozPolia = null;
+    return;
+  }
+
+  const vozes = window.speechSynthesis.getVoices();
+  if (!vozes.length) {
+    vozPolia = null;
+    return;
+  }
+
+  const ptBR = vozes.filter(v => {
+    const lang = (v.lang || '').toLowerCase().replace('_', '-');
+    const nome = (v.name || '').toLowerCase();
+    return lang.startsWith('pt-br') || nome.includes('brazil');
+  });
+
+  if (!ptBR.length) {
+    vozPolia = null;
+    return;
+  }
+
+  const nomesFemininos = ['luciana', 'camila', 'joana', 'fernanda', 'vitoria', 'vitória', 'marisa', 'julia', 'júlia', 'marina', 'barbara', 'bárbara'];
+  const preferidas = [VOZ_PREFERIDA, ...VOZ_ALTERNATIVAS].map(v => v.toLowerCase());
+
+  vozPolia =
+    ptBR.find(v => preferidas.some(p => (v.name || '').toLowerCase().includes(p))) ||
+    ptBR.find(v => nomesFemininos.some(n => (v.name || '').toLowerCase().includes(n))) ||
+    ptBR.find(v => v.default) ||
+    ptBR[0];
+}
+
+function desenharTrilhasFixas() {
+  trilhasSvg.innerHTML = '';
+  const pares = new Set();
+
+  Object.entries(conexoes).forEach(([origem, vizinhos]) => {
+    vizinhos.forEach(destino => {
+      const chave = [origem, destino].sort().join('|');
+      if (pares.has(chave) || !locaisCache[origem] || !locaisCache[destino]) return;
+      
+      const p1 = percentualParaPixel(locaisCache[origem].x, locaisCache[origem].y);
+      const p2 = percentualParaPixel(locaisCache[destino].x, locaisCache[destino].y);
+      
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`);
+      path.setAttribute('class', 'linha-trilha');
+      trilhasSvg.appendChild(path);
+
+      pares.add(chave);
+    });
+  });
+}
+
+function encontrarRota(origem, destino) {
+  if (origem === destino) return [origem];
+  const fila = [[origem]], visitados = new Set([origem]);
+  while (fila.length > 0) {
+    const caminho = fila.shift(), ultimo = caminho[caminho.length - 1];
+    for (const v of (conexoes[ultimo] || [])) {
+      if (visitados.has(v)) continue;
+      const novo = [...caminho, v];
+      if (v === destino) return novo;
+      visitados.add(v); fila.push(novo);
+    }
+  }
+  return null;
+}
+
+async function animarAvatarNaRota(rota, tokenMovimento) {
+  if (!rota || rota.length < 2) return;
+  
+  avatarOnMap.style.transition = `left ${TEMPO_POR_TRECHO}ms linear, top ${TEMPO_POR_TRECHO}ms linear`;
+  avatarOnMap.classList.add('is-walking');
+  let indoEsq = false;
+
+  for (let i = 1; i < rota.length; i++) {
+    if (tokenMovimento !== movimentoTokenAtual) {
+      avatarOnMap.classList.remove('is-walking');
+      return;
+    }
+    indoEsq = (locaisCache[rota[i]].x < locaisCache[rota[i-1]].x);
+    setFrameAvatarMapa(indoEsq ? 'walk2.png' : 'walk1.png');
+    avatarOnMap.style.left = locaisCache[rota[i]].x + "%";
+    avatarOnMap.style.top = locaisCache[rota[i]].y + "%";
+    await new Promise(r => setTimeout(r, TEMPO_POR_TRECHO));
+  }
+  avatarOnMap.classList.remove('is-walking');
+  setFrameAvatarMapa('idle1.png');
+}
+
+function configurarFalaAnimada(texto, poseFinal = POSE_ESPERA, opcoes = {}) {
+  const usarAnimacaoApresentacao = Boolean(opcoes.apresentacao);
+  const poseFinalLocal = POSE_APRESENTACAO_FIM;
+  const animacao = opcoes.animacao || null;
+  const onEnd = typeof opcoes.onEnd === 'function' ? opcoes.onEnd : null;
+  const bocaIntervalo = Number.isFinite(animacao?.boca?.intervalo_ms) ? animacao.boca.intervalo_ms : null;
+  const bocaFrames = Array.isArray(animacao?.boca?.sequencia) && animacao.boca.sequencia.length
+    ? animacao.boca.sequencia
+    : FRAMES_RESPOSTA;
+  
+  const ajustarSequenciaBoca = (frames, maxLen = 60) => {
+    if (!Array.isArray(frames) || !frames.length) return FRAMES_RESPOSTA;
+    if (frames.length <= maxLen) return frames;
+    const passo = Math.ceil(frames.length / maxLen);
+    return frames.filter((_, idx) => idx % passo === 0);
+  };
+  
+  const bocaFramesAjustados = ajustarSequenciaBoca(bocaFrames);
+  const estimarDuracaoTextoMs = (frase) => {
+    const textoLimpo = (frase || '').trim();
+    const palavras = Math.max(1, (textoLimpo.match(/\b\w+\b/g) || []).length);
+    return Math.max(900, Math.floor(((palavras * 0.42) + (textoLimpo.length * 0.004)) * 1000));
+  };
+  
+  falaTokenAtual += 1;
+  const meuToken = falaTokenAtual;
+  const textoFala = ajustarTextoFala(texto);
+
+  window.speechSynthesis.cancel();
+  clearTimeout(talkTimeout);
+  clearTimeout(apresentacaoTimeout);
+  apresentacaoTokenAtual += 1;
+
+  if (usarAnimacaoApresentacao) {
+    setMascotPose(FRAMES_APRESENTACAO[0] || POSE_APRESENTACAO_FIM || POSE_ESPERA);
+  } else {
+    setMascotPose(FRAME_PENSAR);
+  }
+
+  if (audioPoliaAtual) {
+    audioPoliaAtual.pause();
+    audioPoliaAtual = null;
+  }
+  if (audioPoliaUrlAtual) {
+    URL.revokeObjectURL(audioPoliaUrlAtual);
+    audioPoliaUrlAtual = null;
+  }
+
+  const fallbackNavegador = () => {
+    if (USAR_TTS_API && FORCAR_TTS_API) {
+      console.warn('TTS API falhou; fallback de voz desativado.');
+      return;
+    }
+    if (!vozPolia) selecionarVozPolia();
+    const f = new SpeechSynthesisUtterance(textoFala);
+    f.lang = 'pt-BR';
+    f.rate = VELOCIDADE_VOZ;
+    f.pitch = PITCH_VOZ;
+    if (vozPolia && !USAR_VOZ_PADRAO_DO_SISTEMA) {
+      f.voice = vozPolia;
+    }
+    f.onstart = () => {
+      if (meuToken !== falaTokenAtual) return;
+      atualizarBalao(texto);
+      if (usarAnimacaoApresentacao) {
+        iniciarAnimacaoApresentacao(meuToken);
+      } else {
+        iniciarAnimacaoBoca(texto, meuToken, { intervaloMs: bocaIntervalo });
+      }
+    };
+    f.onend = () => {
+      if (meuToken !== falaTokenAtual) return;
+      if (usarAnimacaoApresentacao) {
+        pararAnimacaoApresentacao(poseFinalLocal);
+      } else {
+        pararAnimacaoFala(poseFinalLocal);
+      }
+      if (onEnd) onEnd();
+    };
+    window.speechSynthesis.speak(f);
+  };
+
+  if (!USAR_TTS_API) {
+    fallbackNavegador();
+    return;
+  }
+
+  if (usarAnimacaoApresentacao) {
+    atualizarBalao(texto);
+    setTimeout(() => {
+      if (meuToken !== falaTokenAtual) return;
+      iniciarAnimacaoApresentacao(meuToken, estimarDuracaoTextoMs(texto));
+    }, AUDIO_START_DELAY_MS);
+  }
+
+  setTimeout(async () => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({texto: textoFala})
+      });
+
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      if (!res.ok || contentType.includes('application/json')) {
+        fallbackNavegador();
+        return;
+      }
+
+      const blob = await res.blob();
+      if (!blob || !blob.size) {
+        fallbackNavegador();
+        return;
+      }
+
+      if (meuToken !== falaTokenAtual) return;
+
+      atualizarBalao(texto);
+
+      audioPoliaUrlAtual = URL.createObjectURL(blob);
+      audioPoliaAtual = new Audio(audioPoliaUrlAtual);
+      audioPoliaAtual.onplay = () => {
+        if (meuToken !== falaTokenAtual) return;
+        if (usarAnimacaoApresentacao) {
+          iniciarAnimacaoApresentacao(meuToken, Number.isFinite(audioPoliaAtual.duration) ? audioPoliaAtual.duration * 1000 : null);
+        } else {
+          const duracaoMs = Number.isFinite(audioPoliaAtual.duration) ? audioPoliaAtual.duration * 1000 : null;
+          const intervaloAudio = duracaoMs && bocaFramesAjustados.length
+            ? Math.max(45, Math.floor(duracaoMs / bocaFramesAjustados.length))
+            : null;
+          iniciarAnimacaoBoca(texto, meuToken, { frames: bocaFramesAjustados, intervaloMs: intervaloAudio || bocaIntervalo });
+        }
+      };
+      audioPoliaAtual.onended = () => {
+        if (meuToken !== falaTokenAtual) return;
+        if (usarAnimacaoApresentacao) {
+          pararAnimacaoApresentacao(poseFinalLocal);
+        } else {
+          pararAnimacaoFala(poseFinalLocal);
+        }
+        if (audioPoliaUrlAtual) {
+          URL.revokeObjectURL(audioPoliaUrlAtual);
+          audioPoliaUrlAtual = null;
+        }
+        audioPoliaAtual = null;
+        if (onEnd) onEnd();
+      };
+      audioPoliaAtual.onerror = () => {
+        if (meuToken !== falaTokenAtual) return;
+        if (usarAnimacaoApresentacao) {
+          pararAnimacaoApresentacao(poseFinalLocal);
+        } else {
+          pararAnimacaoFala(poseFinalLocal);
+        }
+        if (audioPoliaUrlAtual) {
+          URL.revokeObjectURL(audioPoliaUrlAtual);
+          audioPoliaUrlAtual = null;
+        }
+        audioPoliaAtual = null;
+        fallbackNavegador();
+      };
+
+      try {
+        tentarTocarAudio(audioPoliaAtual);
+        if (audioBloqueado) {
+          prepararDesbloqueioAudio();
+        }
+      } catch (_) {
+        if (meuToken !== falaTokenAtual) return;
+        fallbackNavegador();
+      }
+    } catch (_) {
+      if (meuToken !== falaTokenAtual) return;
+      fallbackNavegador();
+    }
+  }, 100);
+}
+
+function montarContextoPerfil() {
+  if (!perfilUsuario) return null;
+  return {
+    nome: perfilUsuario.nome || "",
+    email: perfilUsuario.email || "",
+    curso: perfilUsuario.curso || "",
+    funcao: perfilUsuario.funcao || "",
+    email_status: perfilUsuario.emailStatus || "",
+  };
+}
+
+function getCookie(nome) {
+  const partes = document.cookie.split(';').map((c) => c.trim());
+  for (const parte of partes) {
+    if (parte.startsWith(`${nome}=`)) {
+      return decodeURIComponent(parte.substring(nome.length + 1));
+    }
+  }
+  return '';
+}
+
+function deleteCookie(nome) {
+  document.cookie = `${nome}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+}
+
+function setCookie(nome, valor, dias) {
+  const expira = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${nome}=${encodeURIComponent(valor)}; expires=${expira}; path=/; SameSite=Lax`;
+}
+
+function salvarPerfilCookie(perfil) {
+  if (!perfil) return;
+  try {
+    const payload = JSON.stringify(perfil);
+    setCookie(COOKIE_PERFIL, payload, COOKIE_DIAS);
+  } catch (_) {}
+}
+
+function carregarPerfilCookie() {
+  const bruto = getCookie(COOKIE_PERFIL);
+  if (!bruto) return null;
+  try {
+    const data = JSON.parse(bruto);
+    return data && typeof data === 'object' ? data : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function construirMensagemIntro() {
+  const nome = perfilUsuario?.nome ? `Oi, ${perfilUsuario.nome}! ` : "Oi! ";
+  return `${nome}Eu sou a Polia, sua guia da POLI U-P-E. Me diz uma sala ou bloco e eu te levo agora.`;
+}
+
+function apresentarPoliaAoAbrir() {
+  if (poliaJaSeApresentou) return;
+  poliaJaSeApresentou = true;
+
+  const mensagem = construirMensagemIntro();
+  introPendente = mensagem;
+  atualizarBalao(mensagem);
+  if (!audioAtivado) {
+    return;
+  }
+  configurarFalaAnimada(mensagem, POSE_ESPERA, { apresentacao: true });
+}
+
+async function moverPlayer(destino) {
+  if (!locaisCache[destino]) return;
+  mostrarFotoLocal(destino);
+  
+  // Limpa o alvo anterior e DESTACA O NOVO ALVO piscando em amarelo!
+  limparCheckpointAlvo();
+  destacarCheckpoint(destino);
+  
+  const meuTokenMovimento = ++movimentoTokenAtual;
+  setMascotPose(FRAME_PENSAR);
+  
+  const rota = encontrarRota(localAtual, destino);
+  if (!rota) return;
+
+  try {
+    const res = await fetch('/api/guiar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ destino, contexto_extra: montarContextoPerfil() })
+    });
+    const data = await res.json();
+    if (meuTokenMovimento !== movimentoTokenAtual) return;
+    
+    // Boneca começa a andar na rota
+    await animarAvatarNaRota(rota, meuTokenMovimento);
+    
+    if (meuTokenMovimento !== movimentoTokenAtual) return;
+    if (data.status === "sucesso") {
+      localAtual = destino;
+      tituloBloco.innerText = "INFO: " + formatarNomeLocal(destino).toUpperCase();
+      salasBloco.innerHTML = data.salas ? "<strong>Salas:</strong><br>" + data.salas.join("<br>") : "";
+      const framesResposta = data?.animacao?.boca?.sequencia || FRAMES_RESPOSTA;
+      await aguardarFramesMascote(framesResposta, 16, 1800);
+      configurarFalaAnimada(data.texto, POSE_ESPERA, {
+        animacao: data.animacao,
+        onEnd: () => mostrarFotoPendente(destino),
+      });
+    }
+  } catch (e) { setMascotPose(POSE_ESPERA); }
+}
+
+async function perguntarVeterano() {
+  const p = inputPergunta.value.trim(); if (!p) return;
+  ocultarFotoLocal();
+  inputPergunta.value = "";
+  setMascotPose(FRAME_PENSAR);
+  const declaracaoLocalizacao = ehDeclaracaoLocalizacao(p);
+
+  const comandoRota = interpretarComandoRota(p);
+  if (comandoRota?.origem && comandoRota?.destino) {
+    const ok = definirLocalAtual(comandoRota.origem, true);
+    if (ok) {
+      await moverPlayer(comandoRota.destino);
+      return;
+    }
+  }
+
+  if (comandoRota?.origem) {
+    const ok = definirLocalAtual(comandoRota.origem, true);
+    if (ok) {
+      const msg = `Perfeito! Agora vou considerar que você está em ${formatarNomeLocal(comandoRota.origem)}.`;
+      configurarFalaAnimada(msg, POSE_ESPERA);
+      return;
+    }
+  }
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pergunta: p, contexto_extra: montarContextoPerfil() })
+    });
+    const d = await res.json();
+    if (d?.origem && d?.destino && locaisCache[d.origem] && locaisCache[d.destino]) {
+      definirLocalAtual(d.origem, true);
+      await moverPlayer(d.destino);
+      return;
+    }
+    if (d?.origem && !d?.destino && locaisCache[d.origem]) {
+      definirLocalAtual(d.origem, true);
+      configurarFalaAnimada(d.texto || `Perfeito! Agora considero que você está em ${formatarNomeLocal(d.origem).toUpperCase()}.`, POSE_ESPERA, { animacao: d.animacao });
+      return;
+    }
+    if (d?.destino && locaisCache[d.destino]) {
+    if (declaracaoLocalizacao) {
+    definirLocalAtual(d.destino, true);
+    }
+    await moverPlayer(d.destino);
+    return;
+    }
+    configurarFalaAnimada(d.texto || "Não consegui pensar agora.", POSE_ESPERA, { animacao: d.animacao });
+  } catch (e) { setMascotPose(POSE_ESPERA); }
+}
+
+async function carregarLocais() {
+  const resLocais = await fetch('/api/locais');
+  locaisCache = await resLocais.json();
+
+  aliasesLocais = construirAliasesLocais();
+  definirLocalAtual('entrada', true);
+  Object.entries(locaisCache).forEach(([id, d]) => {
+    const ck = document.createElement('div'); ck.className = 'checkpoint';
+    ck.style.left = d.x + '%'; ck.style.top = d.y + '%';
+    const s = document.createElement('span'); s.innerText = abreviarLocal(id);
+    ck.appendChild(s);
+    ck.addEventListener('click', () => moverPlayer(id));
+    checkpointsLayer.appendChild(ck);
+    checkpointsPorId[id] = ck;
+  });
+  desenharTrilhasFixas();
+}
+
+window.speechSynthesis.onvoiceschanged = () => {
+  selecionarVozPolia();
+  setMascotPose(POSE_ESPERA);
+};
+
+// Se redimensionar a tela, as trilhas se ajustam
+window.addEventListener('resize', () => {
+  if (Object.keys(locaisCache).length > 0) {
+    desenharTrilhasFixas();
+    rotaSvg.innerHTML = ''; 
+  }
+});
+
+selecionarVozPolia();
+setMascotPose(POSE_ESPERA);
+preloadFramesAvatarMapa();
+preloadFramesApresentacao();
+setFrameAvatarMapa('idle1.png');
+aguardarFrameInicial().then(() => apresentarPoliaAoAbrir());
+
+if (btnBuscar) btnBuscar.addEventListener('click', perguntarVeterano);
+if (inputPergunta) {
+  inputPergunta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') perguntarVeterano();
+  });
+}
+
+if (gameContainer) {
+  gameContainer.addEventListener('dblclick', (e) => {
+    const rect = gameContainer.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    if (pontoDentroDoRaio(x, y, PONTO_DOMINO, rect)) {
+      acionarEasterEggDomino();
+    }
+  });
+}
+
+if (poliaFotoFechar) {
+  poliaFotoFechar.addEventListener('click', ocultarFotoLocal);
+}
+
+if (poliaFotoImg) {
+  poliaFotoImg.addEventListener('error', () => ocultarFotoLocal());
+}
+
+const cadastroGate = document.getElementById('cadastro-gate');
+const cadastroForm = document.getElementById('cadastro-form');
+const step1 = document.getElementById('cadastro-step-1');
+const step2 = document.getElementById('cadastro-step-2');
+const btnAvancar = document.getElementById('cadastro-avancar');
+const btnVoltar = document.getElementById('cadastro-voltar');
+const btnLimpar = document.getElementById('cadastro-limpar');
+const emailInput = document.getElementById('cadastro-email');
+const nomeInput = document.getElementById('cadastro-nome');
+const cursoSelect = document.getElementById('cadastro-curso');
+const funcaoField = document.getElementById('cadastro-funcao-field');
+const funcaoInput = document.getElementById('cadastro-funcao');
+
+const atualizarEmailInput = () => {
+  const selecionado = document.querySelector('input[name="emailStatus"]:checked');
+  const temEmail = selecionado && selecionado.value === 'sim';
+  if (emailInput) {
+    emailInput.disabled = !temEmail;
+    if (!temEmail) emailInput.value = '';
+  }
+};
+
+const atualizarFuncao = () => {
+  if (!cursoSelect || !funcaoField) return;
+  const mostrar = cursoSelect.value === 'nao_estudante';
+  funcaoField.style.display = mostrar ? 'grid' : 'none';
+  if (!mostrar && funcaoInput) funcaoInput.value = '';
+};
+
+document.querySelectorAll('input[name="emailStatus"]').forEach((radio) => {
+  radio.addEventListener('change', atualizarEmailInput);
+});
+
+if (cursoSelect) {
+  cursoSelect.addEventListener('change', atualizarFuncao);
+}
+
+if (btnAvancar) {
+  btnAvancar.addEventListener('click', () => {
+    if (step1) step1.classList.remove('is-active');
+    if (step2) step2.classList.add('is-active');
+  });
+}
+
+if (btnVoltar) {
+  btnVoltar.addEventListener('click', () => {
+    if (step2) step2.classList.remove('is-active');
+    if (step1) step1.classList.add('is-active');
+  });
+}
+
+if (btnLimpar) {
+  btnLimpar.addEventListener('click', () => {
+    deleteCookie(COOKIE_PERFIL);
+    perfilUsuario = null;
+    audioAtivado = false;
+    introPendente = null;
+    if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'false');
+    if (step2) step2.classList.remove('is-active');
+    if (step1) step1.classList.add('is-active');
+    if (emailInput) emailInput.value = '';
+    if (nomeInput) nomeInput.value = '';
+    if (cursoSelect) cursoSelect.value = '';
+    if (funcaoInput) funcaoInput.value = '';
+    atualizarEmailInput();
+    atualizarFuncao();
+  });
+}
+
+if (cadastroForm) {
+  cadastroForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const emailStatus = document.querySelector('input[name="emailStatus"]:checked')?.value || 'nao_quero';
+    perfilUsuario = {
+      emailStatus,
+      email: emailStatus === 'sim' ? (emailInput?.value || '').trim() : '',
+      nome: (nomeInput?.value || '').trim(),
+      curso: cursoSelect?.value || '',
+      funcao: funcaoInput?.value || '',
+    };
+    salvarPerfilCookie(perfilUsuario);
+    introPendente = construirMensagemIntro();
+    audioAtivado = true;
+    if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'true');
+    if (introPendente) {
+      const texto = introPendente;
+      introPendente = null;
+      configurarFalaAnimada(texto, POSE_ESPERA, { apresentacao: true });
+    }
+  });
+}
+
+const perfilSalvo = carregarPerfilCookie();
+if (perfilSalvo) {
+  perfilUsuario = perfilSalvo;
+  const emailStatus = perfilSalvo.emailStatus || 'nao_quero';
+  const radio = document.querySelector(`input[name="emailStatus"][value="${emailStatus}"]`);
+  if (radio) radio.checked = true;
+  if (emailInput) {
+    emailInput.value = perfilSalvo.email || '';
+  }
+  if (nomeInput) {
+    nomeInput.value = perfilSalvo.nome || '';
+  }
+  if (cursoSelect && perfilSalvo.curso) {
+    cursoSelect.value = perfilSalvo.curso;
+  }
+  if (funcaoInput) {
+    funcaoInput.value = perfilSalvo.funcao || '';
+  }
+  if (step1) step1.classList.remove('is-active');
+  if (step2) step2.classList.add('is-active');
+  if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'false');
+}
+
+atualizarEmailInput();
+atualizarFuncao();
+
+carregarLocais();
+</script>
+</body>
+</html>
