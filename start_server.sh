@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/api_safe.sh" start
+
+# Start FastAPI app directly for Render.
+uvicorn avatar:app --host 0.0.0.0 --port "${PORT:-9000}"
