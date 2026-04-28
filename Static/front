@@ -844,12 +844,12 @@ const RESPOSTA_FIM = 146;
 const FOTOS_POR_BLOCO = {
   "bloco a": { src: "/static/Fotos%20blocos/Bloco%20A%20napsi.png", legenda: "Bloco A (NAPSI)" },
   "bloco b": { src: "/static/Fotos%20blocos/Bloco%20B.png", legenda: "Bloco B" },
-  "bloco c": { src: "/static/Fotos%20blocos/Bloco-C.png", legenda: "Bloco C" },
+  "bloco c": { src: "/static/Fotos%20blocos/Bloco%20C.png", legenda: "Bloco C" },
+  "bloco d": { src: "/static/Fotos%20blocos/Bloco%20D.png", legenda: "Bloco D" },
   "bloco e": { src: "/static/Fotos%20blocos/Bloco%20E.png", legenda: "Bloco E" },
-  "bloco f": { src: "/static/Fotos%20blocos/Bloco%20F.png", legenda: "Bloco F" },
   "bloco g": { src: "/static/Fotos%20blocos/Bloco%20G.png", legenda: "Bloco G" },
   "bloco h": { src: "/static/Fotos%20blocos/Bloco%20H.png", legenda: "Bloco H" },
-  "bloco i/k": { src: "/static/Fotos%20blocos/bloco%20ik.png", legenda: "Bloco I/K" },
+  "bloco i/k": { src: "/static/Fotos%20blocos/Bloco%20IK.png", legenda: "Bloco I/K" },
   "bloco j": { src: "/static/Fotos%20blocos/Bloco%20J.png", legenda: "Bloco J" },
   "lanchonete": { src: "/static/Fotos%20blocos/A-lanchonete.png", legenda: "Lanchonete" },
   "praca-domino": { src: "/static/Fotos%20blocos/Domin%C3%B3.png", legenda: "Praça do Dominó" }
