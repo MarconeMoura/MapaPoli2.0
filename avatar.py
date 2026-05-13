@@ -213,7 +213,7 @@ def calcular_animacao_boca(texto: str, frames_disponiveis: list[str] | None = No
         sequencia = ["frames/frame_0045.png"]
 
     intervalo_ms = int(duracao_estimativa_ms / max(1, len(sequencia)))
-    intervalo_ms = max(45, min(220, intervalo_ms))
+    intervalo_ms = max(33, min(180, intervalo_ms))
 
     return {
         "palavras": palavras,

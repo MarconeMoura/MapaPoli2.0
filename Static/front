@@ -887,10 +887,16 @@ function framePathFromIndex(indiceZeroBaseado) {
   return `frames/frame_${numero}.png`;
 }
 
+function frameIndexFromPath(frame) {
+  const match = /frame_(\d+)\.png$/.exec(frame || '');
+    if (!match) return -1; // Changed return value to -1 for better error handling
+  return Number(match[1]);
+}
+
 function montarSequenciaFrames(inicio, fim) {
   const inicioSeguro = Math.max(0, inicio);
   const fimSeguro = Math.min(TOTAL_FRAMES - 1, fim);
-  if (fimSeguro < inicioSeguro) return [];
+    if (fimSeguro < inicioSeguro) return [framePathFromIndex(inicio)]; // Ensure at least one frame is returned
   return Array.from({ length: fimSeguro - inicioSeguro + 1 }, (_, idx) => framePathFromIndex(inicioSeguro + idx));
 }
 
@@ -1400,20 +1406,34 @@ function setFrameAvatarMapa(frame) {
 
 function iniciarAnimacaoApresentacao(token, duracaoMs = null) {
   const sequencia = FRAMES_APRESENTACAO.length ? FRAMES_APRESENTACAO : [framePathFromIndex(0)];
-  const duracaoSegura = Number.isFinite(duracaoMs) && duracaoMs > 0 ? duracaoMs : sequencia.length * 95;
-  const intervaloMs = Math.max(45, Math.floor(duracaoSegura / Math.max(1, sequencia.length)));
+  const loopFrames = sequencia.filter((frame) => {
+    const idx = frameIndexFromPath(frame);
+    return idx !== null && idx >= 40 && idx <= 118;
+  });
+  const sequenciaLoop = loopFrames.length ? loopFrames : sequencia;
+  const duracaoSegura = Number.isFinite(duracaoMs) && duracaoMs > 0 ? duracaoMs : sequencia.length * 33;
+  const intervaloMs = Math.max(33, Math.floor(duracaoSegura / Math.max(1, sequencia.length)));
+  const limiteFim = Number.isFinite(duracaoMs) && duracaoMs > 0 ? Date.now() + duracaoSegura : null;
 
   apresentacaoTokenAtual = token;
   clearTimeout(apresentacaoTimeout);
 
   let indice = 0;
+  let usandoLoop = false;
   const avancar = () => {
     if (token !== apresentacaoTokenAtual) return;
-    setMascotPose(sequencia[indice]);
-    indice += 1;
-    if (indice >= sequencia.length) {
+    if (limiteFim && Date.now() >= limiteFim) {
       apresentacaoTimeout = null;
       return;
+    }
+    const framesAtivos = usandoLoop ? sequenciaLoop : sequencia;
+    setMascotPose(framesAtivos[indice]);
+    indice += 1;
+    if (!usandoLoop && indice >= sequencia.length) {
+      usandoLoop = true;
+      indice = 0;
+    } else if (usandoLoop && indice >= sequenciaLoop.length) {
+      indice = 0;
     }
     apresentacaoTimeout = setTimeout(avancar, intervaloMs);
   };
@@ -1458,6 +1478,11 @@ function atualizarBalao(texto) {
 function iniciarAnimacaoBoca(texto, token, opcoes = {}) {
   const frames = opcoes.frames || FRAMES_RESPOSTA;
   const framesCarregados = frames.filter((frame) => mascoteFramesCarregados.has(frame));
+  const framesLoop = framesCarregados.filter((frame) => {
+    const idx = frameIndexFromPath(frame);
+    return idx !== null && idx >= 40 && idx <= 118;
+  });
+  const framesBase = framesLoop.length ? framesLoop : framesCarregados;
   if (framesCarregados.length < 8) {
     setTimeout(() => {
       if (token !== falaTokenAtual) return;
@@ -1466,17 +1491,22 @@ function iniciarAnimacaoBoca(texto, token, opcoes = {}) {
     return;
   }
   const intervaloBase = Number.isFinite(opcoes.intervaloMs) ? opcoes.intervaloMs : 120;
+  const duracaoMs = Number.isFinite(opcoes.duracaoMs) ? opcoes.duracaoMs : null;
   let curr = 0;
   if (bocaAnimacaoId) {
     cancelAnimationFrame(bocaAnimacaoId);
   }
   let ultimo = performance.now();
-  const intervalo = Math.max(60, intervaloBase);
+  const intervalo = Math.max(33, intervaloBase);
+  const limiteFim = duracaoMs ? performance.now() + duracaoMs : null;
   const avancar = (agora) => {
     if (token !== falaTokenAtual) return;
+    if (limiteFim && agora >= limiteFim) {
+      return;
+    }
     if (agora - ultimo >= intervalo) {
-      setMascotPose(framesCarregados[curr]);
-      curr = (curr + 1) % framesCarregados.length;
+      setMascotPose(framesBase[curr]);
+      curr = (curr + 1) % framesBase.length;
       ultimo = agora;
     }
     bocaAnimacaoId = requestAnimationFrame(avancar);
@@ -1653,7 +1683,14 @@ function configurarFalaAnimada(texto, poseFinal = POSE_ESPERA, opcoes = {}) {
       if (usarAnimacaoApresentacao) {
         iniciarAnimacaoApresentacao(meuToken);
       } else {
-        iniciarAnimacaoBoca(texto, meuToken, { intervaloMs: bocaIntervalo });
+        const duracaoEstimada = estimarDuracaoTextoMs(texto);
+        const intervaloEstimado = bocaFramesAjustados.length
+          ? Math.max(33, Math.floor(duracaoEstimada / bocaFramesAjustados.length))
+          : null;
+        iniciarAnimacaoBoca(texto, meuToken, {
+          intervaloMs: intervaloEstimado || bocaIntervalo,
+          duracaoMs: duracaoEstimada,
+        });
       }
     };
     f.onend = () => {
@@ -1713,10 +1750,12 @@ function configurarFalaAnimada(texto, poseFinal = POSE_ESPERA, opcoes = {}) {
           iniciarAnimacaoApresentacao(meuToken, Number.isFinite(audioPoliaAtual.duration) ? audioPoliaAtual.duration * 1000 : null);
         } else {
           const duracaoMs = Number.isFinite(audioPoliaAtual.duration) ? audioPoliaAtual.duration * 1000 : null;
-          const intervaloAudio = duracaoMs && bocaFramesAjustados.length
-            ? Math.max(45, Math.floor(duracaoMs / bocaFramesAjustados.length))
-            : null;
-          iniciarAnimacaoBoca(texto, meuToken, { frames: bocaFramesAjustados, intervaloMs: intervaloAudio || bocaIntervalo });
+          const intervaloAudio = 33;
+          iniciarAnimacaoBoca(texto, meuToken, {
+            frames: bocaFramesAjustados,
+            intervaloMs: intervaloAudio || bocaIntervalo,
+            duracaoMs: duracaoMs,
+          });
         }
       };
       audioPoliaAtual.onended = () => {
