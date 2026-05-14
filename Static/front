@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Mapa Interativo POLI UPE</title>
+<title>Mapa Interativo POL.IA</title>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap');
@@ -1451,7 +1451,7 @@ function aplicarTransformMascote() {
 function ajustarTextoTela(texto) {
   const base = (texto || '').toString();
   return base
-    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'UPE')
+    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'POL.IA')
     .replace(/\bPolía\b/gi, 'POLI')
     .replace(/\bPolí\b/gi, 'POLI');
 }
@@ -1850,7 +1850,7 @@ function carregarPerfilCookie() {
 
 function construirMensagemIntro() {
   const nome = perfilUsuario?.nome ? `Oi, ${perfilUsuario.nome}! ` : "Oi! ";
-  return `${nome}Eu sou a Polia, sua guia da POLI U-P-E. Me diz uma sala ou bloco e eu te levo agora.`;
+  return `${nome}Eu sou a Polia, sua guia da POL.IA. Me diz uma sala ou bloco e eu te levo agora.`;
 }
 
 function apresentarPoliaAoAbrir() {
