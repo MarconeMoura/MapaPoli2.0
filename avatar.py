@@ -387,13 +387,13 @@ locais_campus = {
     "bloco j": {
         "x": 80.06,
         "y": 61.97,
-        "salas": ["Labs de Eletrotécnica","Laboratório de telecomunicações", "laboratório de máquinas elétricas", "laboratório de eletrônica","Mecatrônica"],
+        "salas": ["Labs de Eletrotécnica","Laboratório de telecomunicações", "laboratório de máquinas elétricas", "laboratório de eletrônica","Laboratório de Mecatrônica"],
         "dica": "Paraíso pra quem curte elétrica. Atenção com equipamentos.",
     },
     "bloco c": {
         "x": 89.26,
         "y": 58.69,
-        "salas": ["Laboratório de Física Experimental", "Labs de Computação", "PPGEC", "Corisco", "Space maker", "Labmaker", "Espaço maker"],
+        "salas": ["Laboratório de Física Experimental", "Labs de Computação", "PPGEC", "Corisco", "Space Maker", "Lab Stream"],
         "dica": "Esse bloco vai aparecer bastante na tua rotina de computação.",
     },
 }

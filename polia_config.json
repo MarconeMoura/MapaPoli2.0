@@ -52,6 +52,10 @@
     "lanchonete": [
       "cafe",
       "lanche"
+    ],
+    "space maker": [
+      "labmaker",
+      "espaco maker"
     ]
   },
   "locais_override": {

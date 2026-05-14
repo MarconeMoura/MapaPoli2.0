@@ -385,19 +385,6 @@ animation: heroGlow 2.8s ease-in-out infinite;
 z-index: 0;
 }
 
-.mascot-card::after {
-content: "";
-position: absolute;
-width: 254px;
-height: 254px;
-left: 50%;
-bottom: var(--hero-ring-bottom-desktop);
-transform: translateX(-50%);
-border-radius: 50%;
-border: 2px dashed rgba(201, 72, 135, 0.35);
-animation: heroRing 8s linear infinite;
-z-index: 0;
-}
 
 /* Tamanho do avatar - DESKTOP */
 #polia-side-shell {
@@ -413,9 +400,9 @@ z-index: 1;
 width: 368px;
 height: 368px;
 object-fit: contain;
-filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.25));
+filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.28)) saturate(1.06) contrast(1.03);
 transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-animation: heroFloat 3s ease-in-out infinite;
+animation: heroFloat 3s ease-in-out infinite, heroPulse 5.4s ease-in-out infinite;
 }
 
 @keyframes heroGlow {
@@ -423,14 +410,14 @@ animation: heroFloat 3s ease-in-out infinite;
 50% { opacity: 1; transform: translateX(-50%) scale(1.06); }
 }
 
-@keyframes heroRing {
-from { transform: translateX(-50%) rotate(0deg); }
-to { transform: translateX(-50%) rotate(360deg); }
-}
-
 @keyframes heroFloat {
 0%, 100% { margin-bottom: 0; }
 50% { margin-bottom: 6px; }
+}
+
+@keyframes heroPulse {
+0%, 100% { transform: translateZ(0) scale(1); }
+50% { transform: translateZ(0) scale(1.02) rotate(-0.6deg); }
 }
 
 .interactive-column {
@@ -540,11 +527,14 @@ line-height: 1;
 }
 
 #polia-foto-img {
-  width: 100%;
-  height: 190px;
+  width: 440px;
+  height: 440px;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 10px;
   border: 2px solid #f0bfd7;
+  display: block;
+  margin: 0 auto;
 }
 
 .hero-search-card {
@@ -648,7 +638,6 @@ body { padding: 8px; }
 #polia-side-shell { width: 290px; height: 290px; }
 #polia-side-mascot { width: 276px; height: 276px; }
 .mascot-card::before { width: 144px; height: 144px; bottom: var(--hero-glow-bottom-mobile); }
-.mascot-card::after { width: 160px; height: 160px; bottom: var(--hero-ring-bottom-mobile); }
 .hero-search-card strong { font-size: 0.94rem; }
 .search-row { grid-template-columns: 1fr; }
 }
@@ -799,8 +788,8 @@ const AUDIO_START_DELAY_MS = 2500;
 // (edite aqui para ir testando)
 // =========================
 const UI_TUNING = {
-  heroGlowBottomDesktop: 80,
-  heroRingBottomDesktop: 80,
+  heroGlowBottomDesktop: 90,
+  heroRingBottomDesktop: 90,
   heroGlowBottomMobile: 58,
   heroRingBottomMobile: 70,
 };
@@ -849,10 +838,11 @@ const FOTOS_POR_BLOCO = {
   "bloco e": { src: "/static/Fotos%20blocos/Bloco%20E.png", legenda: "Bloco E" },
   "bloco g": { src: "/static/Fotos%20blocos/Bloco%20G.png", legenda: "Bloco G" },
   "bloco h": { src: "/static/Fotos%20blocos/Bloco%20H.png", legenda: "Bloco H" },
-  "bloco i/k": { src: "/static/Fotos%20blocos/Bloco%20IK.png", legenda: "Bloco I/K" },
+  "bloco i/k": { src: "/static/Fotos%20blocos/Bloco%20I%3AK.png", legenda: "Bloco I/K" },
   "bloco j": { src: "/static/Fotos%20blocos/Bloco%20J.png", legenda: "Bloco J" },
-  "lanchonete": { src: "/static/Fotos%20blocos/A-lanchonete.png", legenda: "Lanchonete" },
-  "praca-domino": { src: "/static/Fotos%20blocos/Domin%C3%B3.png", legenda: "Praça do Dominó" }
+  "da": { src: "/static/Fotos%20blocos/Da.png", legenda: "D.A" },
+  "lanchonete": { src: "/static/Fotos%20blocos/Lanchonete.png", legenda: "Lanchonete" },
+  "praca-domino": { src: "/static/Fotos%20blocos/Pra%C3%A7a%20do%20domino.png", legenda: "Praça do Dominó" }
 };
 
 const PONTO_DOMINO = { x: 72.78, y: 56.81, raioPx: 32 };
@@ -864,6 +854,7 @@ const ALIASES_EXTRA_POR_LOCAL = {
 "maker",
 "maker space",
 "space maker",
+"espaco maker",
 "spacemaker",
 "laboratorio steam",
 "lab steam",
@@ -998,7 +989,7 @@ const conexoes = {
 
 function formatarNomeLocal(id) { return id.replace(/\b\w/g, l => l.toUpperCase()); }
 function abreviarLocal(id) {
-  const m = { "entrada": "IN", "estacionamento": "EST", "lanchonete": "LAN", "bloco a": "A", "bloco h": "H", "bloco g": "G", "bloco f": "F", "bloco b": "B", "da": "DA", "bloco i/k": "I/K", "bloco e": "E", "bloco d": "D", "bloco j": "J", "bloco c": "C" };
+  const m = { "entrada": "ENT", "estacionamento": "EST", "lanchonete": "LAN", "bloco a": "A", "bloco h": "H", "bloco g": "G", "bloco f": "F", "bloco b": "B", "da": "DA", "bloco i/k": "I/K", "bloco e": "E", "bloco d": "D", "bloco j": "J", "bloco c": "C" };
   if (m[id]) return m[id];
   if (id.startsWith('bloco ')) {
     const sufixo = id.replace('bloco ', '').trim().toUpperCase();
@@ -1120,6 +1111,11 @@ function construirAliasesLocais() {
             adicionarAlias(alias, id, 3);
           });
       });
+    });
+
+    const extras = ALIASES_EXTRA_POR_LOCAL[idNorm] || ALIASES_EXTRA_POR_LOCAL[id] || [];
+    extras.forEach((alias) => {
+      adicionarAlias(normalizarTexto(alias), id, 3);
     });
   });
 
