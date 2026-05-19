@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import os
 import random
@@ -12,8 +14,8 @@ from typing import Any
 import certifi
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -245,6 +247,11 @@ OPENAI_TTS_INSTRUCTIONS = os.getenv(
     "OPENAI_TTS_INSTRUCTIONS",
     "Fale em portugues do Brasil, voz feminina natural, tom acolhedor e claro.",
 )
+
+DA_USER = "da"
+DA_PASSWORD = "diretorio@academico"
+DA_SECRET = os.getenv("DA_SECRET") or os.getenv("SECRET_KEY") or "dev-secret"
+DA_COOKIE_NAME = "da_auth"
 
 genai_client = None
 if GOOGLE_API_KEY:
@@ -1102,6 +1109,32 @@ def salvar_config_polia(nova_config: dict[str, Any]) -> None:
         json.dump(nova_config, f, ensure_ascii=False, indent=2)
 
 
+def _da_config_valida() -> bool:
+    return bool(DA_USER and DA_PASSWORD)
+
+
+def _da_assinatura(usuario: str) -> str:
+    chave = DA_SECRET.encode("utf-8")
+    payload = f"{usuario}:{DA_PASSWORD}".encode("utf-8")
+    return hmac.new(chave, payload, hashlib.sha256).hexdigest()
+
+
+def _da_gerar_token(usuario: str) -> str:
+    return f"{usuario}:{_da_assinatura(usuario)}"
+
+
+def _da_autenticado(request: Request) -> bool:
+    token = request.cookies.get(DA_COOKIE_NAME)
+    if not token:
+        return False
+    if ":" not in token:
+        return False
+    usuario, assinatura = token.split(":", 1)
+    if not usuario or usuario != DA_USER:
+        return False
+    return hmac.compare_digest(assinatura, _da_assinatura(usuario))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def ler_index() -> str:
     candidatos = [
@@ -1117,6 +1150,206 @@ async def ler_index() -> str:
             with open(caminho, "r", encoding="utf-8") as f:
                 return f.read()
     return "<h1>Arquivo de interface nao encontrado.</h1>"
+
+
+@app.get("/da/login", response_class=HTMLResponse)
+async def pagina_login_da() -> str:
+        if not _da_config_valida():
+                return """
+                <h1>Configuração do D.A ausente</h1>
+                <p>Defina as variáveis de ambiente <strong>DA_USER</strong> e <strong>DA_PASSWORD</strong>.</p>
+                """
+
+        return """
+        <!DOCTYPE html>
+        <html lang="pt-br">
+        <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Acesso D.A</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Space+Grotesk:wght@400;600;700&display=swap');
+                :root {
+                    --pink-strong: #c74788;
+                    --pink-soft: #ffe1f1;
+                    --rose: #8b1f4f;
+                    --green-strong: #1f8b3b;
+                    --green-bright: #7eea4b;
+                }
+                * { box-sizing: border-box; }
+                body {
+                    font-family: "Space Grotesk", "Nunito", sans-serif;
+                    background: radial-gradient(circle at 20% 10%, #fff8fc 0, #ffe6f3 35%, #ffd4e8 100%);
+                    margin: 0;
+                    display: grid;
+                    place-items: center;
+                    min-height: 100vh;
+                    color: #4a1634;
+                    padding: 18px;
+                }
+                .backdrop {
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                    background:
+                        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 40%),
+                        radial-gradient(circle at 10% 80%, rgba(255, 241, 210, 0.7), rgba(255, 241, 210, 0) 42%);
+                }
+                .card {
+                    position: relative;
+                    background: #ffffff;
+                    border-radius: 20px;
+                    padding: 22px 22px 20px;
+                    box-shadow: 0 22px 36px rgba(117, 25, 74, 0.18);
+                    width: min(420px, 92vw);
+                    border: 2px solid rgba(199, 71, 136, 0.45);
+                    overflow: hidden;
+                }
+                .card::before {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    background: radial-gradient(circle at 90% 0%, rgba(255, 225, 241, 0.7), rgba(255, 225, 241, 0) 55%);
+                    pointer-events: none;
+                }
+                h1 {
+                    margin: 0 0 10px;
+                    color: var(--rose);
+                    font-family: "Baloo 2", sans-serif;
+                    font-size: 1.6rem;
+                    letter-spacing: 0.3px;
+                }
+                .subtitle {
+                    margin: 0 0 14px;
+                    font-size: 0.95rem;
+                    color: #6d2850;
+                }
+                label {
+                    display: block;
+                    font-weight: 700;
+                    color: #6d2850;
+                    margin-top: 10px;
+                }
+                input {
+                    width: 100%;
+                    height: 42px;
+                    border-radius: 12px;
+                    border: 2px solid #e1a8c6;
+                    padding: 0 12px;
+                    margin-top: 6px;
+                    font-size: 0.95rem;
+                    outline: none;
+                    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+                }
+                input:focus {
+                    border-color: #ffce6a;
+                    box-shadow: 0 0 0 3px rgba(255, 206, 106, 0.3);
+                }
+                button {
+                    margin-top: 16px;
+                    width: 100%;
+                    height: 46px;
+                    border-radius: 14px;
+                    border: 2px solid #17692c;
+                    background: linear-gradient(180deg, var(--green-bright), var(--green-strong));
+                    color: #0f3318;
+                    font-family: "Baloo 2", sans-serif;
+                    font-size: 1.05rem;
+                    font-weight: 800;
+                    cursor: pointer;
+                    box-shadow: 0 12px 18px rgba(25, 95, 39, 0.25);
+                    transition: transform 0.12s ease;
+                }
+                button:hover { transform: translateY(-1px); }
+                .hint { margin-top: 12px; font-size: 0.86rem; color: #6d2850; }
+            </style>
+        </head>
+        <body>
+            <div class="backdrop" aria-hidden="true"></div>
+            <form class="card" method="post" action="/da/login">
+                <h1>Diretório Acadêmico</h1>
+                <p class="subtitle">Acesso interno do D.A</p>
+                <label for="usuario">Usuário</label>
+                <input id="usuario" name="usuario" type="text" autocomplete="username" required />
+                <label for="senha">Senha</label>
+                <input id="senha" name="senha" type="password" autocomplete="current-password" required />
+                <button type="submit">Entrar</button>
+                <div class="hint">Acesso restrito ao D.A</div>
+            </form>
+        </body>
+        </html>
+        """
+
+
+@app.post("/da/login")
+async def autenticar_da(usuario: str = Form(...), senha: str = Form(...)):
+        if not _da_config_valida():
+                return HTMLResponse(
+                        "<h1>Configuração do D.A ausente</h1>",
+                        status_code=500,
+                )
+
+        if usuario != DA_USER or senha != DA_PASSWORD:
+                return HTMLResponse(
+                        "<h1>Credenciais inválidas</h1><p><a href=\"/da/login\">Voltar</a></p>",
+                        status_code=401,
+                )
+
+        resposta = RedirectResponse(url="/da", status_code=302)
+        resposta.set_cookie(
+                DA_COOKIE_NAME,
+                _da_gerar_token(usuario),
+                httponly=True,
+                samesite="lax",
+                secure=False,
+                max_age=60 * 60 * 8,
+        )
+        return resposta
+
+
+@app.get("/da", response_class=HTMLResponse)
+async def pagina_da(request: Request) -> HTMLResponse:
+        if not _da_autenticado(request):
+                return RedirectResponse(url="/da/login", status_code=302)
+
+        return HTMLResponse(
+                """
+                <!DOCTYPE html>
+                <html lang="pt-br">
+                <head>
+                    <meta charset="UTF-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1" />
+                    <title>D.A - Diretório Acadêmico</title>
+                    <style>
+                        body { font-family: "Nunito", "Segoe UI", sans-serif; margin: 0; background: #ffeaf6; color: #5b1b3f; }
+                        header { padding: 18px 20px; background: #c94887; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+                        header h1 { margin: 0; font-family: "Baloo 2", sans-serif; font-size: 1.4rem; }
+                        header a { color: #fff; text-decoration: none; font-weight: 700; }
+                        main { padding: 18px 20px; }
+                        .card { background: #fff; border: 2px solid #d98ab2; border-radius: 16px; padding: 18px; box-shadow: 0 12px 20px rgba(117, 25, 74, 0.18); }
+                    </style>
+                </head>
+                <body>
+                    <header>
+                        <h1>Diretório Acadêmico</h1>
+                        <a href="/da/logout">Sair</a>
+                    </header>
+                    <main>
+                        <div class="card">
+                            <p>Conteúdo privado do D.A. Pode atualizar este bloco com comunicados e links internos.</p>
+                        </div>
+                    </main>
+                </body>
+                </html>
+                """
+        )
+
+
+@app.get("/da/logout")
+async def sair_da() -> RedirectResponse:
+        resposta = RedirectResponse(url="/da/login", status_code=302)
+        resposta.delete_cookie(DA_COOKIE_NAME)
+        return resposta
 
 
 @app.get("/api/locais")

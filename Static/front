@@ -62,9 +62,38 @@ padding: 16px 16px 14px;
 }
 
 .topbar {
-display: block;
+display: flex;
 align-items: center;
+justify-content: center;
 margin-bottom: 8px;
+position: relative;
+min-height: 44px;
+}
+
+.da-button {
+position: absolute;
+right: 0;
+top: 50%;
+transform: translateY(-50%);
+display: inline-flex;
+align-items: center;
+justify-content: center;
+min-width: 56px;
+height: 36px;
+padding: 0 12px;
+border-radius: 12px;
+border: 2px solid var(--botao-borda);
+background: linear-gradient(180deg, #fff6fb, #f7dce9);
+color: #7f1f4f;
+font-family: "Baloo 2", sans-serif;
+font-weight: 800;
+letter-spacing: 0.5px;
+text-decoration: none;
+box-shadow: 0 6px 12px rgba(117, 25, 74, 0.18);
+}
+
+.da-button:hover {
+transform: translateY(-52%) scale(1.02);
 }
 
 .audio-gate {
@@ -712,7 +741,8 @@ body { padding: 8px; }
 
 <div class="game-shell">
 <header class="topbar">
-<h1 class="brand">UPE</h1>
+<h1 class="brand">POL.IA</h1>
+<a class="da-button" href="/da" aria-label="Acesso ao Diretório Acadêmico">D.A</a>
 </header>
 
 <section class="control-strip">
@@ -1451,7 +1481,7 @@ function aplicarTransformMascote() {
 function ajustarTextoTela(texto) {
   const base = (texto || '').toString();
   return base
-    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'POL.IA')
+    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'POLI')
     .replace(/\bPolía\b/gi, 'POLI')
     .replace(/\bPolí\b/gi, 'POLI');
 }
@@ -1850,7 +1880,7 @@ function carregarPerfilCookie() {
 
 function construirMensagemIntro() {
   const nome = perfilUsuario?.nome ? `Oi, ${perfilUsuario.nome}! ` : "Oi! ";
-  return `${nome}Eu sou a Polia, sua guia da POL.IA. Me diz uma sala ou bloco e eu te levo agora.`;
+  return `${nome}Eu sou a Polia, sua guia da POLI. Me diz uma sala ou bloco e eu te levo agora.`;
 }
 
 function apresentarPoliaAoAbrir() {
