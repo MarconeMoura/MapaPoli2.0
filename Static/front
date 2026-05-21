@@ -880,6 +880,12 @@ const PONTO_DOMINO = { x: 72.78, y: 56.81, raioPx: 32 };
 
 const ALIASES_EXTRA_POR_LOCAL = {
 "bloco c": [
+"f01-lip1",
+"f01 lip1",
+"laboratorio de ecomp",
+"ecomp",
+"laboratorio de engenharia da computacao",
+"lab ecomp",
 "lab maker",
 "labmaker",
 "maker",

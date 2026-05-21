@@ -483,6 +483,17 @@ CONHECIMENTO_PRATICO_POR_LOCAL = {
     ],
 }
 
+EXTRA_ALIASES_POR_LOCAL = {
+    "bloco c": [
+        "f01-lip1",
+        "f01 lip1",
+        "laboratorio de ecomp",
+        "ecomp",
+        "laboratorio de engenharia da computacao",
+        "lab ecomp",
+    ],
+}
+
 ultimas_falas_por_bloco: dict[str, str] = {}
 historico_fallback_por_bloco: dict[str, list[str]] = {}
 historico_falas_ia_por_bloco: dict[str, list[str]] = {}
@@ -736,6 +747,12 @@ def construir_indice_salas() -> list[tuple[str, str, str]]:
                 label_codigo = f"{prefixo.upper()}-{numero.zfill(2)}"
                 for alias in gerar_aliases_codigo(prefixo, numero):
                     indice.append((alias, destino, label_codigo))
+
+        extras = EXTRA_ALIASES_POR_LOCAL.get(destino.lower(), [])
+        for alias in extras:
+            alias_norm = normalizar_texto(alias)
+            if alias_norm:
+                indice.append((alias_norm, destino, alias))
 
     return deduplicar_indice(indice)
 
