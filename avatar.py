@@ -46,6 +46,7 @@ POLIA_CONFIG_PADRAO: dict[str, Any] = {
         "objetivo": "Responder duvida geral do calouro de forma util e natural.",
         "regras": ["Responda com no maximo 3 frases.", "Seja direto e natural."],
         "fallback": "Tenta me perguntar por bloco ou sala, tipo B01, K06 ou Biblioteca, que eu te guio rapidinho.",
+        "fora_contexto": "Eu so consigo falar sobre a POLI U-P-E e o campus. Pergunta por bloco, sala ou servico da POLI que eu te ajudo.",
     },
     "destino": {
         "objetivo": "Classificar a intencao da pergunta e inferir destino do campus.",
@@ -592,6 +593,14 @@ def escolher_fala_fallback(destino_id: str, opcoes: list[str]) -> str:
     usadas.add(frase)
     historico_fallback_por_bloco[destino_id] = list(usadas)
     return frase
+
+
+def obter_resposta_fora_contexto() -> str:
+    chat_cfg = POLIA_CONFIG.get("chat") or {}
+    return (
+        chat_cfg.get("fora_contexto")
+        or "Eu so consigo falar sobre a POLI U-P-E e o campus. Pergunta por bloco, sala ou servico da POLI que eu te ajudo."
+    )
 
 
 def normalizar_texto(texto: str) -> str:
@@ -1510,7 +1519,12 @@ async def chat_veterano(req: RequisicaoChat) -> dict[str, Any]:
 
     chat_cfg = POLIA_CONFIG.get("chat") or {}
     objetivo_chat = chat_cfg.get("objetivo") or "Responder duvida geral do calouro de forma util e natural."
-    regras_chat = chat_cfg.get("regras") or ["Responda com no maximo 3 frases.", "Seja direto e natural."]
+    regras_chat = list(
+        chat_cfg.get("regras") or ["Responda com no maximo 3 frases.", "Seja direto e natural."]
+    )
+    regras_chat.append(
+        "Se a pergunta estiver fora do contexto da POLI U-P-E, diga que voce so fala sobre o campus e sugira perguntar por bloco ou sala."
+    )
 
     prompt = montar_prompt_polia(
         objetivo=objetivo_chat,
@@ -1534,11 +1548,11 @@ async def chat_veterano(req: RequisicaoChat) -> dict[str, Any]:
             response = genai_client.models.generate_content(model=GEMINI_TEXT_MODEL, contents=prompt)
             texto = (response.text or "").strip()
         if not texto:
-            texto = "Posso te ajudar com rotas por bloco e sala. Manda um local que eu te levo."
+            texto = obter_resposta_fora_contexto()
         return {"status": "sucesso", "texto": texto, "animacao": metadados_animacao_para_texto(texto)}
     except Exception as e:
         print(f"Erro no chat IA: {e}")
-        texto = "Deu ruim na IA agora, mas ainda consigo te guiar se tu disser uma sala ou bloco."
+        texto = obter_resposta_fora_contexto()
         return {
             "status": "sucesso",
             "texto": texto,
