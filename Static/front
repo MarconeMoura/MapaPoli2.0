@@ -801,12 +801,12 @@ const TEMPO_POR_TRECHO = 1400;
 const INTERVALO_PASSOS = 420;
 const ATIVAR_MOVIMENTO_CONTINUO = false;
 const USAR_TTS_API = true;
-const FORCAR_TTS_API = true;
-const USAR_VOZ_PADRAO_DO_SISTEMA = true;
-const VELOCIDADE_VOZ = 0.7; 
-const PITCH_VOZ = 2.5; 
+const FORCAR_TTS_API = false;
+const USAR_VOZ_PADRAO_DO_SISTEMA = false;
+const VELOCIDADE_VOZ = 0.85;
+const PITCH_VOZ = 2.8;
 const VOZ_PREFERIDA = 'Luciana';
-const VOZ_ALTERNATIVAS = ['Luciana', 'Fernanda', 'Joana', 'Google português do Brasil'];
+const VOZ_ALTERNATIVAS = ['Luciana', 'Francisca', 'Fernanda', 'Joana', 'Google português do Brasil'];
 const INTERVALO_IDLE_MIN = 900;
 const INTERVALO_IDLE_MAX = 1900;
 const BLINK_MIN = 2200;
@@ -861,6 +861,7 @@ const RESPOSTA_INICIO = 49;
 const RESPOSTA_FIM = 146;
 
 const FOTOS_POR_BLOCO = {
+  "entrada": { src: "/static/Fotos%20blocos/Portaria.png", legenda: "Portaria (Entrada)" },
   "bloco a": { src: "/static/Fotos%20blocos/Bloco%20A%20napsi.png", legenda: "Bloco A (NAPSI)" },
   "bloco b": { src: "/static/Fotos%20blocos/Bloco%20B.png", legenda: "Bloco B" },
   "bloco c": { src: "/static/Fotos%20blocos/Bloco%20C.png", legenda: "Bloco C" },
@@ -945,6 +946,7 @@ let audioAtivado = false;
 let bocaAnimacaoId = null;
 let perfilUsuario = null;
 let fotoPendenteId = null;
+let fotoEntradaLiberada = false;
 
 const COOKIE_PERFIL = 'polia_cadastro';
 const COOKIE_DIAS = 180;
@@ -1052,6 +1054,7 @@ function ocultarFotoLocal() {
 
 function mostrarFotoLocal(destinoId) {
   if (!poliaFotoBalao || !poliaFotoImg || !poliaFotoCaption) return;
+  if (destinoId === 'entrada' && !fotoEntradaLiberada) return;
   const info = FOTOS_POR_BLOCO[destinoId];
   if (!info || !info.src) return;
   poliaFotoImg.src = info.src;
@@ -1478,20 +1481,52 @@ function aplicarTransformMascote() {
   poliaSideMascot.style.transform = `translate(${basePose.x + microMovimento.x}px, ${basePose.y + microMovimento.y}px) rotate(${microMovimento.rot}deg) scale(${basePose.scale}) scaleY(${microMovimento.blinkY})`;
 }
 
+function corrigirAcentuacaoBasica(texto) {
+  const aplicarCase = (original, destino) => {
+    if (!original) return destino;
+    if (original[0] === original[0].toUpperCase()) {
+      return destino[0].toUpperCase() + destino.slice(1);
+    }
+    return destino;
+  };
+  const trocas = [
+    [/\bvoce\b/gi, 'você'],
+    [/\bnao\b/gi, 'não'],
+    [/\bate\b/gi, 'até'],
+    [/\batras\b/gi, 'atrás'],
+    [/\bpredio\b/gi, 'prédio'],
+    [/\bportao\b/gi, 'portão'],
+    [/\bdiretorio\b/gi, 'diretório'],
+    [/\bacademico\b/gi, 'acadêmico'],
+    [/\bpraca\b/gi, 'praça'],
+    [/\bdomino\b/gi, 'dominó'],
+    [/\blaboratorio\b/gi, 'laboratório'],
+  ];
+  return trocas.reduce(
+    (acc, [regex, destino]) => acc.replace(regex, (m) => aplicarCase(m, destino)),
+    texto || ''
+  );
+}
+
 function ajustarTextoTela(texto) {
   const base = (texto || '').toString();
-  return base
+  return corrigirAcentuacaoBasica(base
+    .replace(/\bPOLI\s+U\s*-\s*P\s*-\s*E\b/gi, 'POLI')
     .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'POLI')
     .replace(/\bPolía\b/gi, 'POLI')
-    .replace(/\bPolí\b/gi, 'POLI');
+    .replace(/\bPolí\b/gi, 'POLI')
+    .replace(/\bPOLI\s+POLI\b/gi, 'POLI'));
 }
 
 function ajustarTextoFala(texto) {
-  return (texto || '')
+  return corrigirAcentuacaoBasica((texto || '')
     .toString()
+    .replace(/\bPOLI\s+U\s*-\s*P\s*-\s*E\b/gi, 'POLI')
+    .replace(/\bU\s*-\s*P\s*-\s*E\b/gi, 'POLI')
     .replace(/\bPolia\b/gi, 'Polía')
     .replace(/\bPoli\b/gi, 'Polí')
-    .replace(/\bPOLI\b/g, 'Polí');
+    .replace(/\bPOLI\b/g, 'Polí')
+    .replace(/\bPolí\s+Polí\b/g, 'Polí'));
 }
 
 function atualizarBalao(texto) {
@@ -1898,6 +1933,9 @@ function apresentarPoliaAoAbrir() {
 
 async function moverPlayer(destino) {
   if (!locaisCache[destino]) return;
+  if (destino === 'entrada') {
+    fotoEntradaLiberada = true;
+  }
   mostrarFotoLocal(destino);
   
   // Limpa o alvo anterior e DESTACA O NOVO ALVO piscando em amarelo!

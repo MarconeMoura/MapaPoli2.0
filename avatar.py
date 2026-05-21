@@ -245,7 +245,7 @@ OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "shimmer")
 GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.0-flash")
 OPENAI_TTS_INSTRUCTIONS = os.getenv(
     "OPENAI_TTS_INSTRUCTIONS",
-    "Fale em portugues do Brasil, voz feminina natural, tom acolhedor e claro.",
+    "Fale em portugues do Brasil, voz feminina jovem, levemente infantil, tom acolhedor e claro.",
 )
 
 DA_USER = "da"
@@ -460,7 +460,7 @@ CONHECIMENTO_PRATICO_POR_LOCAL = {
         "Atrás do Bloco A fica uma lanchonete com lanches muito elogiados.",
     ],
     "bloco b": [
-        "Muitas aulas dos períodos iniciais acontecem no Bloco B.",
+        "As aulas ficam na parte de baixo do Bloco B; em cima ficam a Escolaridade e a Divisao de Estagio.",
         "Na Escolaridade são resolvidas pendências de matrícula.",
         "Na Escolaridade, é importante tratar Diva com respeito e gentileza.",
     ],
@@ -690,6 +690,14 @@ def construir_indice_salas() -> list[tuple[str, str, str]]:
     for destino, dados in locais_campus.items():
         indice.append((normalizar_texto(destino), destino, destino.upper()))
 
+        if destino.lower().startswith("bloco") and "/" in destino:
+            sufixo = destino.lower().replace("bloco", "", 1)
+            letras = re.findall(r"[a-z]", sufixo)
+            for letra in letras:
+                termo = normalizar_texto(f"bloco {letra}")
+                if termo:
+                    indice.append((termo, destino, f"Bloco {letra.upper()}"))
+
         for item in dados["salas"]:
             item_norm = normalizar_texto(item)
             if item_norm:
@@ -739,6 +747,7 @@ def adicionar_sinonimos() -> None:
     sinonimos = {
         "biblioteca": ["bib", "livros", "estudo", "estudar", "acervo"],
         "lanchonete": ["lanche", "comida", "restaurante", "cafe", "lanchar"],
+        "portaria": ["magaiver", "lanches do magaiver", "lanche do magaiver", "lanchonete do magaiver"],
         "laboratorio": ["lab", "oficina", "pratica", "equipamento"],
         "eletrotecnica": ["eletro", "eletrica", "elet"],
         "robotica": ["robo"],
@@ -910,6 +919,14 @@ def inferir_rota_por_texto(pergunta: str) -> dict[str, str] | None:
     return None
 
 
+def _detectar_consulta_lanche(texto_norm: str) -> dict[str, bool]:
+    return {
+        "tem_lanche": bool(re.search(r"\b(lanche|lanchonete|lanchar|salgado|comida|cafe)\b", texto_norm)),
+        "tem_magaiver": bool(re.search(r"\b(magaiver|portaria)\b", texto_norm)),
+        "tem_bloco_a": bool(re.search(r"\b(bloco a|poli)\b", texto_norm)),
+    }
+
+
 async def inferir_destino_com_ia(pergunta: str, contexto_extra: Any = None) -> dict[str, str] | None:
     destinos_validos = list(locais_campus.keys())
     destino_cfg = POLIA_CONFIG.get("destino") or {}
@@ -954,8 +971,14 @@ async def inferir_destino_com_ia(pergunta: str, contexto_extra: Any = None) -> d
 
 
 async def gerar_fala_com_ia(destino_id: str, dados_local: dict, contexto_extra: Any = None) -> str:
-    if destino_id == "lanchonete":
-        return "A lanchonete fica atrás do Bloco A, aquele prédio rosa. É o point do intervalo."
+    falas_fixas = {
+        "entrada": "Voce chegou na entrada principal, na Portaria. Se precisar, pergunte que eu te guio.",
+        "estacionamento": "Voce chegou no estacionamento. As vagas sao para servidores e para alunos de moto.",
+        "lanchonete": "A lanchonete fica atras do Bloco A, aquele predio rosa. E o point do intervalo.",
+    }
+    fala_fixa = falas_fixas.get(destino_id)
+    if fala_fixa:
+        return fala_fixa
 
     local = destino_id.upper()
     salas = ", ".join(dados_local["salas"])
@@ -1095,6 +1118,10 @@ class RequisicaoTTS(BaseModel):
 
 def descrever_localizacao_destino(destino_id: str) -> str:
     destino_norm = (destino_id or "").lower().strip()
+    if destino_norm == "entrada":
+        return "Fica na entrada principal, na Portaria."
+    if destino_norm == "estacionamento":
+        return "Fica no estacionamento, logo apos a entrada."
     if destino_norm == "lanchonete":
         return "Fica atrás do Bloco A, aquele prédio rosa."
     if destino_norm.startswith("bloco "):
@@ -1422,6 +1449,22 @@ async def chat_veterano(req: RequisicaoChat) -> dict[str, Any]:
                 "texto": msg,
                 "animacao": metadados_animacao_para_texto(msg),
             }
+
+    pergunta_norm = normalizar_texto(req.pergunta)
+    lanche_info = _detectar_consulta_lanche(pergunta_norm)
+    if lanche_info["tem_lanche"]:
+        if lanche_info["tem_magaiver"]:
+            texto = "Os Lanches do Magaiver ficam na Portaria, logo na entrada principal."
+        elif lanche_info["tem_bloco_a"]:
+            texto = "A lanchonete da POLI fica atras do Bloco A, aquele predio rosa."
+        else:
+            texto = "Tem dois pontos: Lanches do Magaiver na entrada/portaria e a lanchonete da POLI atras do Bloco A. Qual voce quer?"
+        return {
+            "status": "sucesso",
+            "tipo": "lanche",
+            "texto": texto,
+            "animacao": metadados_animacao_para_texto(texto),
+        }
 
     busca = buscar_destino_por_sala(req.pergunta)
     if busca:
