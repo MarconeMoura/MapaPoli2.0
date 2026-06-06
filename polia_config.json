@@ -66,10 +66,10 @@
       "Quando houver bloco informado, cite o bloco.",
       "Se nao houver dado cadastrado, diga que ainda nao foi mapeado."
     ],
-    "fallback": "Todos os blocos possuem escadas, nem todos possuem elevadores, e as rampas estao sendo construidas gradativamente.",
+    "fallback": "Todos os blocos possuem escadas, temos elevadores nos blocos B, I, K e na biblioteca, e as rampas estao sendo construidas gradativamente.",
     "geral": [
       "Todos os blocos possuem escadas.",
-      "Nem todos os blocos possuem elevadores.",
+      "A POLI tem elevador no bloco B, bloco I, bloco K e na biblioteca.",
       "As rampas estao sendo construidas gradativamente."
     ],
     "rampa": [
@@ -79,7 +79,7 @@
       "Todos os blocos possuem escadas."
     ],
     "elevador": [
-      "Nem todos os blocos possuem elevadores."
+      "Temos elevadores no bloco B, bloco I, bloco K e na biblioteca."
     ]
   },
   "acessibilidade_locais": [
@@ -163,6 +163,15 @@
       "bloco": "bloco e",
       "texto": "",
       "rotulo": "Rampa"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-47a8-9b0c-1d2e3f4a5b6c",
+      "tipo": "elevador",
+      "x": 0.0,
+      "y": 0.0,
+      "bloco": "biblioteca",
+      "texto": "",
+      "rotulo": "Elevador"
     }
   ],
   "locais_override": {

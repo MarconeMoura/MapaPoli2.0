@@ -272,6 +272,81 @@ inset: 0;
 z-index: 6;
 }
 
+#acessibilidade-layer {
+position: absolute;
+inset: 0;
+z-index: 7;
+pointer-events: none;
+}
+
+.acess-marker {
+position: absolute;
+transform: translate(-50%, -100%);
+pointer-events: none;
+}
+
+.acess-pin {
+width: 36px;
+height: 36px;
+border-radius: 999px;
+display: grid;
+place-items: center;
+font-size: 17px;
+font-weight: 900;
+background: var(--marker-fundo, #fff);
+color: var(--marker-cor, #333);
+border: 2px solid var(--marker-cor, #333);
+box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.acess-marker:hover {
+z-index: 12;
+}
+
+.acessibilidade-strip {
+margin-top: 14px;
+background: rgba(255, 255, 255, 0.72);
+border: 2px solid rgba(201, 72, 135, 0.22);
+border-radius: 18px;
+padding: 12px 14px;
+box-shadow: 0 10px 18px rgba(117, 25, 74, 0.12);
+}
+
+.acessibilidade-strip h3 {
+margin: 0 0 10px;
+font-family: "Baloo 2", sans-serif;
+font-size: 1.05rem;
+color: #7f1f4f;
+}
+
+.acessibilidade-legenda {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+gap: 10px;
+}
+
+.acessibilidade-legenda-item {
+display: flex;
+align-items: flex-start;
+gap: 10px;
+padding: 10px 12px;
+border-radius: 14px;
+background: rgba(255, 255, 255, 0.88);
+border: 1px solid rgba(117, 25, 74, 0.12);
+box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+}
+
+.acessibilidade-legenda-icon {
+width: 30px;
+height: 30px;
+border-radius: 999px;
+display: grid;
+place-items: center;
+font-size: 14px;
+font-weight: 900;
+flex: 0 0 auto;
+}
+
 .checkpoint {
 position: absolute;
 width: 46px;
@@ -787,9 +862,15 @@ body { padding: 8px; }
 <svg id="rota-svg">
   </svg>
 <div id="checkpoints-layer"></div>
+<div id="acessibilidade-layer"></div>
 <div id="avatar-on-map" style="left: 32%; top: 80%;"></div>
 </div>
 </main>
+
+<section class="acessibilidade-strip" aria-label="Legenda de acessibilidade">
+<h3>Acessibilidade no mapa</h3>
+<div id="acessibilidade-legenda-lista" class="acessibilidade-legenda"></div>
+</section>
 </div>
 
 <script>
@@ -846,6 +927,8 @@ const poliaFotoImg = document.getElementById('polia-foto-img');
 const poliaFotoCaption = document.getElementById('polia-foto-caption');
 const poliaFotoFechar = document.getElementById('polia-foto-fechar');
 const checkpointsLayer = document.getElementById('checkpoints-layer');
+const acessibilidadeLayer = document.getElementById('acessibilidade-layer');
+const acessibilidadeLegendaLista = document.getElementById('acessibilidade-legenda-lista');
 const trilhasSvg = document.getElementById('trilhas-svg');
 const rotaSvg = document.getElementById('rota-svg');
 
@@ -1009,6 +1092,7 @@ function aguardarFrameInicial(timeoutMs = 1500) {
 }
 
 let locaisCache = {};
+let acessibilidadeCache = [];
 let localAtual = 'entrada';
 let aliasesLocais = [];
 let talkTimeout, idleTimeout, blinkTimeout;
@@ -1370,6 +1454,90 @@ function atualizarInfoDestino(destinoId) {
   tituloBloco.innerText = 'INFO: ' + formatarNomeLocal(destinoId).toUpperCase();
   const salas = locaisCache[destinoId].salas || [];
   salasBloco.innerHTML = salas.length ? '<strong>Salas:</strong><br>' + salas.join('<br>') : '';
+}
+
+function tipoConfigAcessibilidade(tipo) {
+  const mapa = {
+    rampa: { rotulo: 'Rampa', icone: '↗', cor: '#1f8b3b', fundo: '#daf8df' },
+    escada: { rotulo: 'Escada', icone: '🪜', cor: '#8b5a2b', fundo: '#f7e3cb' },
+    elevador: { rotulo: 'Elevador', icone: '⇅', cor: '#1f5aa8', fundo: '#d9e9ff' },
+  };
+  return mapa[(tipo || 'rampa').toLowerCase()] || mapa.rampa;
+}
+
+function normalizarMarcadorAcessibilidade(item) {
+  if (!item || typeof item !== 'object') return null;
+  const x = Number(item.x);
+  const y = Number(item.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return {
+    id: String(item.id || ''),
+    tipo: (item.tipo || 'rampa').toLowerCase(),
+    x,
+    y,
+    bloco: String(item.bloco || '').trim().toLowerCase(),
+    texto: String(item.texto || '').trim(),
+    rotulo: String(item.rotulo || '').trim(),
+  };
+}
+
+function legendaAcessibilidade(item) {
+  const cfg = tipoConfigAcessibilidade(item.tipo);
+  const bloco = (item.bloco || '').trim();
+  const texto = (item.texto || '').trim();
+  const partes = [cfg.rotulo];
+  if (bloco) partes.push(bloco.toUpperCase());
+  if (texto) partes.push(texto);
+  return partes.join(' • ');
+}
+
+function renderizarAcessibilidade() {
+  if (!acessibilidadeLayer) return;
+  acessibilidadeLayer.innerHTML = '';
+  acessibilidadeCache.forEach((item) => {
+    const cfg = tipoConfigAcessibilidade(item.tipo);
+    const marker = document.createElement('div');
+    marker.className = 'acess-marker';
+    marker.dataset.id = item.id;
+    marker.style.left = `${item.x}%`;
+    marker.style.top = `${item.y}%`;
+    marker.style.setProperty('--marker-cor', cfg.cor);
+    marker.style.setProperty('--marker-fundo', cfg.fundo);
+    marker.innerHTML = `<div class="acess-pin">${cfg.icone}</div>`;
+    marker.title = legendaAcessibilidade(item);
+    acessibilidadeLayer.appendChild(marker);
+  });
+
+  if (!acessibilidadeLegendaLista) return;
+  acessibilidadeLegendaLista.innerHTML = '';
+  [
+    { tipo: 'rampa', texto: 'Rampa' },
+    { tipo: 'escada', texto: 'Escada' },
+    { tipo: 'elevador', texto: 'Elevador' },
+  ].forEach((item) => {
+    const cfg = tipoConfigAcessibilidade(item.tipo);
+    const card = document.createElement('div');
+    card.className = 'acessibilidade-legenda-item';
+    card.innerHTML = `<div class="acessibilidade-legenda-icon" style="background:${cfg.fundo}; color:${cfg.cor}; border:2px solid ${cfg.cor};">${cfg.icone}</div><div><strong>${item.texto}</strong></div>`;
+    acessibilidadeLegendaLista.appendChild(card);
+  });
+}
+
+async function carregarAcessibilidade() {
+  try {
+    const res = await fetch('/api/acessibilidade');
+    const data = await res.json();
+    if (!Array.isArray(data)) {
+      acessibilidadeCache = [];
+      renderizarAcessibilidade();
+      return;
+    }
+    acessibilidadeCache = data.map(normalizarMarcadorAcessibilidade).filter(Boolean);
+    renderizarAcessibilidade();
+  } catch (_) {
+    acessibilidadeCache = [];
+    renderizarAcessibilidade();
+  }
 }
 
 function percentualParaPixel(x, y) {
@@ -2045,6 +2213,7 @@ async function carregarLocais() {
     checkpointsPorId[id] = ck;
   });
   desenharTrilhasFixas();
+  await carregarAcessibilidade();
 }
 
 window.speechSynthesis.onvoiceschanged = () => {

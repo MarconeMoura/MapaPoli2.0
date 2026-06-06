@@ -86,14 +86,14 @@ POLIA_CONFIG_PADRAO: dict[str, Any] = {
             "Quando houver bloco informado, cite o bloco.",
             "Se nao houver dado cadastrado, diga que ainda nao foi mapeado.",
         ],
-        "fallback": "Todos os blocos possuem escadas, nem todos possuem elevadores, e as rampas estao sendo construidas gradativamente.",
+        "fallback": "Todos os blocos possuem escadas, nem todos possuem elevadores, e as rampas estao sendo construídas gradativamente.",
         "geral": [
             "Todos os blocos possuem escadas.",
             "Nem todos os blocos possuem elevadores.",
-            "As rampas estao sendo construidas gradativamente.",
+            "As rampas estao sendo construídas gradativamente.",
         ],
         "rampa": [
-            "As rampas estao sendo construidas gradativamente na POLI.",
+            "As rampas estao sendo construídas gradativamente na POLI.",
         ],
         "escada": [
             "Todos os blocos possuem escadas.",
@@ -1352,12 +1352,117 @@ def formatar_marcador_acessibilidade(item: dict[str, Any]) -> str:
     return " - ".join(partes)
 
 
+def extrair_tipo_acessibilidade_pergunta(texto_norm: str) -> str | None:
+    for tipo in ("elevador", "escada", "rampa"):
+        if tipo in texto_norm:
+            return tipo
+    return None
+
+
+def extrair_blocos_acessibilidade_pergunta(texto_norm: str) -> list[str]:
+    blocos: list[str] = []
+
+    for destino in locais_campus:
+        nome_norm = normalizar_texto(destino)
+        if nome_norm and len(nome_norm) > 2 and re.search(rf"\b{re.escape(nome_norm)}\b", texto_norm):
+            blocos.append(destino)
+
+    for match in re.finditer(r"\bbloco\s+([a-z])\b", texto_norm):
+        bloco = aliases_blocos.get(match.group(1))
+        if bloco:
+            blocos.append(bloco)
+
+    if "biblioteca" in texto_norm:
+        blocos.append("biblioteca")
+
+    return list(dict.fromkeys(blocos))
+
+
+def responder_acessibilidade_por_bloco(
+    tipo: str,
+    blocos_pedidos: list[str],
+    marcadores: list[dict[str, Any]],
+    acess_cfg: dict[str, Any],
+) -> str | None:
+    if tipo == "elevador":
+        rotulo_plural = "elevadores"
+    elif tipo == "escada":
+        rotulo_plural = "escadas"
+    else:
+        rotulo_plural = "rampas"
+
+    if tipo == "escada":
+        if blocos_pedidos:
+            if len(blocos_pedidos) == 1:
+                return f"Sim. O {blocos_pedidos[0].upper()} tem escadas."
+            blocos_txt = ", ".join(bloco.upper() for bloco in blocos_pedidos)
+            return f"Sim. Os blocos {blocos_txt} têm escadas."
+        geral = acess_cfg.get("escada") or []
+        if isinstance(geral, list):
+            for item in geral:
+                texto = str(item).strip()
+                if texto:
+                    return texto
+        return "Sim. Todos os blocos possuem escadas."
+
+    filtrados = [m for m in marcadores if m.get("tipo") == tipo]
+    if blocos_pedidos:
+        blocos_set = {bloco.strip().lower() for bloco in blocos_pedidos if str(bloco).strip()}
+        filtrados = [m for m in filtrados if str(m.get("bloco") or "").strip().lower() in blocos_set]
+        bloco_txt = ", ".join(bloco.upper() for bloco in blocos_pedidos)
+        if filtrados:
+            return f"Sim. Tem {ACESSIBILIDADE_TIPOS[tipo]['rotulo'].lower()} no {bloco_txt}."
+        return f"Nao encontrei {ACESSIBILIDADE_TIPOS[tipo]['rotulo'].lower()} cadastrada no {bloco_txt}."
+
+    if filtrados:
+        blocos_encontrados = sorted({str(m.get("bloco") or "").strip().upper() for m in filtrados if str(m.get("bloco") or "").strip()})
+        if blocos_encontrados:
+            if len(blocos_encontrados) == 1:
+                return f"Sim. Tem {rotulo_plural} no {blocos_encontrados[0]}."
+            return f"Sim. Tem {rotulo_plural} nos blocos {', '.join(blocos_encontrados)}."
+        return f"Sim. Tem {rotulo_plural} cadastrados na POLI."
+
+    if tipo == "elevador":
+        return "Nao encontrei elevador cadastrado nesse bloco."
+    if tipo == "rampa":
+        return "Ainda nao tenho rampa cadastrada nesse bloco."
+    return None
+
+
+def formatar_blocos_acessibilidade(blocos: list[str]) -> str:
+    partes: list[str] = []
+    for bloco in blocos:
+        bloco_norm = str(bloco or "").strip()
+        if not bloco_norm:
+            continue
+        if bloco_norm.lower() == "biblioteca":
+            partes.append("na biblioteca")
+        else:
+            partes.append(f"no {bloco_norm.upper()}")
+
+    if not partes:
+        return ""
+    if len(partes) == 1:
+        return partes[0]
+    return ", ".join(partes[:-1]) + " e " + partes[-1]
+
+
 def encontrar_acessibilidade_por_pergunta(pergunta: str) -> str | None:
     texto_norm = normalizar_texto(pergunta)
     if not texto_norm:
         return None
 
     acess_cfg = POLIA_CONFIG.get("acessibilidade") or {}
+    marcadores = carregar_acessibilidade()
+    blocos_pedidos = extrair_blocos_acessibilidade_pergunta(texto_norm)
+    tipo_pedido = extrair_tipo_acessibilidade_pergunta(texto_norm)
+    pergunta_lista = bool(re.search(r"\b(onde|quais|quais\s+sao|quais\s+tem|onde\s+tem)\b", texto_norm))
+
+    pergunta_direta = bool(re.search(r"\b(existe|tem|ha|há|possui|conta\s+com)\b", texto_norm))
+    if tipo_pedido and (pergunta_direta or blocos_pedidos):
+        resposta_direta = responder_acessibilidade_por_bloco(tipo_pedido, blocos_pedidos, marcadores, acess_cfg)
+        if resposta_direta:
+            return resposta_direta
 
     consulta_geral = bool(re.search(r"\b(acessibilidade|acessivel|pcd|cadeirante|mobilidade)\b", texto_norm))
     if consulta_geral and not any(tipo in texto_norm for tipo in ACESSIBILIDADE_TIPOS):
@@ -1371,20 +1476,29 @@ def encontrar_acessibilidade_por_pergunta(pergunta: str) -> str | None:
     if not tipos_pedidos:
         return None
 
-    marcadores = carregar_acessibilidade()
-
-    blocos_pedidos = []
-    for destino, dados in locais_campus.items():
-        nome_norm = normalizar_texto(destino)
-        if nome_norm and nome_norm in texto_norm:
-            blocos_pedidos.append(destino)
-
     respostas = []
     for tipo in tipos_pedidos:
         itens = _montar_falas_acessibilidade_config(tipo)
         filtrados = [m for m in marcadores if m.get("tipo") == tipo]
         if blocos_pedidos:
             filtrados = [m for m in filtrados if not m.get("bloco") or m.get("bloco") in blocos_pedidos]
+        if pergunta_lista and not blocos_pedidos:
+            blocos_encontrados = []
+            for marcador in filtrados:
+                bloco = str(marcador.get("bloco") or "").strip()
+                if bloco:
+                    blocos_encontrados.append(bloco)
+            blocos_encontrados = list(dict.fromkeys(blocos_encontrados))
+            if blocos_encontrados:
+                blocos_txt = formatar_blocos_acessibilidade(blocos_encontrados)
+                if tipo == "elevador":
+                    rotulo_lista = "elevadores"
+                elif tipo == "escada":
+                    rotulo_lista = "escadas"
+                else:
+                    rotulo_lista = "rampas"
+                respostas.append(f"Tem {rotulo_lista} {blocos_txt}.")
+                continue
         for marcador in filtrados:
             bloco = str(marcador.get("bloco") or "").strip().upper()
             texto = str(marcador.get("texto") or "").strip()
@@ -1399,7 +1513,13 @@ def encontrar_acessibilidade_por_pergunta(pergunta: str) -> str | None:
         if not itens:
             respostas.append(f"Nao encontrei {ACESSIBILIDADE_TIPOS[tipo]['rotulo'].lower()} cadastrada")
             continue
-        respostas.append(f"{ACESSIBILIDADE_TIPOS[tipo]['rotulo']}s: " + "; ".join(itens[:5]))
+        if tipo == "elevador":
+            rotulo_plural = "elevadores"
+        elif tipo == "escada":
+            rotulo_plural = "escadas"
+        else:
+            rotulo_plural = "rampas"
+        respostas.append(f"{ACESSIBILIDADE_TIPOS[tipo]['rotulo']} {rotulo_plural}: " + "; ".join(itens[:5]))
 
     if respostas:
         return " | ".join(respostas)
