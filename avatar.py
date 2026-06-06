@@ -1,3 +1,4 @@
+import html
 import hashlib
 import hmac
 import json
@@ -16,7 +17,7 @@ import certifi
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -78,6 +79,30 @@ POLIA_CONFIG_PADRAO: dict[str, Any] = {
     # Para adicionar sinonimos extras (exemplo):
     # "sinonimos_extra": {"biblioteca": ["bibli", "acervo"]}
     "sinonimos_extra": {},
+    "acessibilidade": {
+        "objetivo": "Responder sobre rampas, escadas e elevadores da POLI com base nos pontos cadastrados.",
+        "regras": [
+            "Seja objetiva e clara.",
+            "Quando houver bloco informado, cite o bloco.",
+            "Se nao houver dado cadastrado, diga que ainda nao foi mapeado.",
+        ],
+        "fallback": "Todos os blocos possuem escadas, nem todos possuem elevadores, e as rampas estao sendo construidas gradativamente.",
+        "geral": [
+            "Todos os blocos possuem escadas.",
+            "Nem todos os blocos possuem elevadores.",
+            "As rampas estao sendo construidas gradativamente.",
+        ],
+        "rampa": [
+            "As rampas estao sendo construidas gradativamente na POLI.",
+        ],
+        "escada": [
+            "Todos os blocos possuem escadas.",
+        ],
+        "elevador": [
+            "Nem todos os blocos possuem elevadores.",
+        ],
+    },
+    "acessibilidade_locais": [],
 }
 
 
@@ -1146,6 +1171,20 @@ class RotasPayload(BaseModel):
     rotas_offset: dict[str, dict[str, float]] | None = None
 
 
+class MarcadorAcessibilidadePayload(BaseModel):
+    id: str | None = None
+    tipo: str
+    x: float
+    y: float
+    bloco: str | None = None
+    texto: str | None = None
+    rotulo: str | None = None
+
+
+class AcessibilidadePayload(BaseModel):
+    marcadores: list[MarcadorAcessibilidadePayload]
+
+
 class RequisicaoTTS(BaseModel):
     texto: str
 
@@ -1207,6 +1246,196 @@ def registrar_email_cadastro(email: str) -> None:
         return
     with open(CADASTRO_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
         f.write(email_limpo + "\n")
+
+
+ACESSIBILIDADE_TIPOS = {
+    "rampa": {"rotulo": "Rampa", "icone": "↗", "cor": "#1f8b3b", "fundo": "#daf8df"},
+    "escada": {"rotulo": "Escada", "icone": "🪜", "cor": "#8b5a2b", "fundo": "#f7e3cb"},
+    "elevador": {"rotulo": "Elevador", "icone": "⇅", "cor": "#1f5aa8", "fundo": "#d9e9ff"},
+}
+
+
+def _montar_falas_acessibilidade_config(tipo: str) -> list[str]:
+    cfg = POLIA_CONFIG.get("acessibilidade") or {}
+    dados = cfg.get(tipo)
+    falas: list[str] = []
+
+    if isinstance(dados, str) and dados.strip():
+        return [dados.strip()]
+    if not isinstance(dados, list):
+        return []
+
+    for item in dados:
+        if isinstance(item, str):
+            txt = item.strip()
+            if txt:
+                falas.append(txt)
+            continue
+        if not isinstance(item, dict):
+            continue
+        bloco = str(item.get("bloco") or "").strip().upper()
+        texto = str(item.get("texto") or item.get("local") or item.get("descricao") or item.get("fala") or "").strip()
+        if bloco and texto:
+            falas.append(f"{bloco} - {texto}")
+        elif texto:
+            falas.append(texto)
+    return falas
+
+
+def normalizar_tipo_acessibilidade(tipo: str) -> str:
+    tipo_norm = normalizar_texto(tipo)
+    if tipo_norm in ACESSIBILIDADE_TIPOS:
+        return tipo_norm
+    if "rampa" in tipo_norm:
+        return "rampa"
+    if "escada" in tipo_norm:
+        return "escada"
+    if "elevador" in tipo_norm:
+        return "elevador"
+    return "rampa"
+
+
+def normalizar_marcador_acessibilidade(item: Any) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    tipo = normalizar_tipo_acessibilidade(str(item.get("tipo") or ""))
+    x = item.get("x")
+    y = item.get("y")
+    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+        return None
+    bloco = str(item.get("bloco") or "").strip().lower()
+    if bloco and bloco not in locais_campus:
+        bloco = ""
+    texto = str(item.get("texto") or "").strip()
+    rotulo = str(item.get("rotulo") or "").strip() or ACESSIBILIDADE_TIPOS[tipo]["rotulo"]
+    return {
+        "id": str(item.get("id") or uuid.uuid4().hex),
+        "tipo": tipo,
+        "x": float(x),
+        "y": float(y),
+        "bloco": bloco,
+        "texto": texto,
+        "rotulo": rotulo,
+    }
+
+
+def carregar_acessibilidade() -> list[dict[str, Any]]:
+    dados = POLIA_CONFIG.get("acessibilidade_locais") or []
+    if not isinstance(dados, list):
+        return []
+    normalizados: list[dict[str, Any]] = []
+    for item in dados:
+        marcador = normalizar_marcador_acessibilidade(item)
+        if marcador:
+            normalizados.append(marcador)
+    return normalizados
+
+
+def salvar_acessibilidade(marcadores: list[dict[str, Any]]) -> None:
+    config_atual = carregar_config_polia()
+    config_atual["acessibilidade_locais"] = marcadores
+    salvar_config_polia(config_atual)
+    global POLIA_CONFIG
+    POLIA_CONFIG = config_atual
+
+
+def formatar_marcador_acessibilidade(item: dict[str, Any]) -> str:
+    tipo = str(item.get("tipo") or "rampa").strip().lower()
+    bloco = str(item.get("bloco") or "").strip().upper()
+    texto = str(item.get("texto") or "").strip()
+    base = ACESSIBILIDADE_TIPOS.get(tipo, ACESSIBILIDADE_TIPOS["rampa"])["rotulo"]
+    partes = [base]
+    if bloco:
+        partes.append(f"no {bloco}")
+    if texto:
+        partes.append(texto)
+    return " - ".join(partes)
+
+
+def encontrar_acessibilidade_por_pergunta(pergunta: str) -> str | None:
+    texto_norm = normalizar_texto(pergunta)
+    if not texto_norm:
+        return None
+
+    acess_cfg = POLIA_CONFIG.get("acessibilidade") or {}
+
+    consulta_geral = bool(re.search(r"\b(acessibilidade|acessivel|pcd|cadeirante|mobilidade)\b", texto_norm))
+    if consulta_geral and not any(tipo in texto_norm for tipo in ACESSIBILIDADE_TIPOS):
+        geral_cfg = acess_cfg.get("geral") or []
+        if isinstance(geral_cfg, list):
+            gerais = [str(x).strip() for x in geral_cfg if str(x).strip()]
+            if gerais:
+                return " | ".join(gerais[:3])
+
+    tipos_pedidos = [tipo for tipo in ACESSIBILIDADE_TIPOS if tipo in texto_norm]
+    if not tipos_pedidos:
+        return None
+
+    marcadores = carregar_acessibilidade()
+
+    blocos_pedidos = []
+    for destino, dados in locais_campus.items():
+        nome_norm = normalizar_texto(destino)
+        if nome_norm and nome_norm in texto_norm:
+            blocos_pedidos.append(destino)
+
+    respostas = []
+    for tipo in tipos_pedidos:
+        itens = _montar_falas_acessibilidade_config(tipo)
+        filtrados = [m for m in marcadores if m.get("tipo") == tipo]
+        if blocos_pedidos:
+            filtrados = [m for m in filtrados if not m.get("bloco") or m.get("bloco") in blocos_pedidos]
+        for marcador in filtrados:
+            bloco = str(marcador.get("bloco") or "").strip().upper()
+            texto = str(marcador.get("texto") or "").strip()
+            trecho = bloco or "campus"
+            if texto:
+                trecho = f"{trecho} - {texto}"
+            itens.append(trecho)
+
+        # Remove duplicadas preservando ordem para evitar repeticao nas falas.
+        itens = list(dict.fromkeys([i for i in itens if i]))
+
+        if not itens:
+            respostas.append(f"Nao encontrei {ACESSIBILIDADE_TIPOS[tipo]['rotulo'].lower()} cadastrada")
+            continue
+        respostas.append(f"{ACESSIBILIDADE_TIPOS[tipo]['rotulo']}s: " + "; ".join(itens[:5]))
+
+    if respostas:
+        return " | ".join(respostas)
+
+    fallback = str(acess_cfg.get("fallback") or "").strip()
+    if fallback:
+        return fallback
+    return "Ainda nao mapeei rampas, escadas ou elevadores no campus."
+
+
+def serializar_acessibilidade_html(marcadores: list[dict[str, Any]]) -> str:
+    itens = []
+    for marcador in marcadores:
+        tipo = str(marcador.get("tipo") or "rampa").strip().lower()
+        cfg = ACESSIBILIDADE_TIPOS.get(tipo, ACESSIBILIDADE_TIPOS["rampa"])
+        itens.append(
+            "<div class=\"acess-marker\" data-id=\"{id}\" data-tipo=\"{tipo}\" style=\"left:{x}%;top:{y}%;--marker-cor:{cor};--marker-fundo:{fundo};\">"
+            "<div class=\"acess-pin\"><span>{icone}</span></div>"
+            "</div>".format(
+                id=marcador.get("id", ""),
+                tipo=tipo,
+                x=marcador.get("x", 0),
+                y=marcador.get("y", 0),
+                cor=cfg["cor"],
+                fundo=cfg["fundo"],
+                icone=cfg["icone"],
+            )
+        )
+    return "".join(itens)
+
+
+def garantir_arquivo_texto(caminho: str) -> None:
+    if os.path.exists(caminho):
+        return
+    with open(caminho, "a", encoding="utf-8"):
+        pass
 
 
 def resolver_bloco_id(texto: str) -> str | None:
@@ -1570,6 +1799,8 @@ async def pagina_da(request: Request) -> HTMLResponse:
                 <h1>Diretório Acadêmico</h1>
                 <div class="actions">
                     <a href="/">Mapa</a>
+                    <a href="/da/acessibilidade">Acessibilidade</a>
+                    <a href="/da/cadastros/emails/download">Baixar emails</a>
                     <a href="/da/logout">Sair</a>
                 </div>
             </header>
@@ -1636,6 +1867,317 @@ async def sair_da() -> RedirectResponse:
         resposta = RedirectResponse(url="/da/login", status_code=302)
         resposta.delete_cookie(DA_COOKIE_NAME)
         return resposta
+
+
+@app.get("/da/cadastros/emails/download")
+async def baixar_emails_cadastro(request: Request):
+    if not _da_autenticado(request):
+        return RedirectResponse(url="/da/login", status_code=302)
+
+    garantir_arquivo_texto(CADASTRO_EMAILS_ARQUIVO)
+    return FileResponse(
+        CADASTRO_EMAILS_ARQUIVO,
+        media_type="text/plain; charset=utf-8",
+        filename="cadastro_emails.txt",
+    )
+
+
+@app.get("/da/acessibilidade", response_class=HTMLResponse)
+async def pagina_acessibilidade_da(request: Request) -> HTMLResponse:
+        if not _da_autenticado(request):
+                return RedirectResponse(url="/da/login", status_code=302)
+
+        blocos_options = "".join(
+                [f'<option value="{bid}">{bid.upper()}</option>' for bid in sorted([b for b in locais_campus.keys() if b.startswith("bloco ")])]
+        )
+        marcadores = carregar_acessibilidade()
+        marcadores_html = serializar_acessibilidade_html(marcadores)
+
+        return HTMLResponse(
+                f"""
+                <!DOCTYPE html>
+                <html lang="pt-br">
+                <head>
+                        <meta charset="UTF-8" />
+                        <meta name="viewport" content="width=device-width, initial-scale=1" />
+                        <title>D.A - Acessibilidade</title>
+                        <style>
+                                @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap');
+                                body {{ margin: 0; font-family: "Nunito", sans-serif; background: linear-gradient(180deg, #ffe7f2, #ffd1e6); color: #5b1b3f; }}
+                                .shell {{ min-height: 100vh; padding: 18px; }}
+                                .header {{ display:flex; justify-content:space-between; align-items:center; gap: 12px; margin-bottom: 14px; }}
+                                .header h1 {{ margin:0; font-family:"Baloo 2", sans-serif; font-size: 1.6rem; }}
+                                .header a {{ text-decoration:none; color:#7f1f4f; font-weight:800; background:#fff; border:2px solid #d98ab2; border-radius:12px; padding:8px 12px; }}
+                                .grid {{ display:grid; grid-template-columns: 320px 1fr; gap: 14px; align-items:start; }}
+                                .card {{ background:#fff; border:2px solid #d98ab2; border-radius:18px; padding:16px; box-shadow: 0 12px 20px rgba(117,25,74,.18); }}
+                                .toolbar {{ display:grid; gap:10px; }}
+                                label {{ display:block; font-weight:800; margin-bottom:6px; }}
+                                input, select, button {{ font: inherit; }}
+                                input, select {{ width:100%; min-height:42px; border-radius:12px; border:2px solid #e1a8c6; padding:0 12px; }}
+                                button {{ min-height:42px; border-radius:12px; border:2px solid #16702c; background: linear-gradient(180deg, #95e95b, #279f39); font-weight:800; color:#103417; cursor:pointer; }}
+                                .secondary {{ border-color:#d98ab2; background: linear-gradient(180deg, #fff6fb, #f4d8e6); color:#7f1f4f; }}
+                                .map-wrap {{ position:relative; width:100%; aspect-ratio: 1.4 / 1; overflow:hidden; border-radius:18px; border:2px solid #d98ab2; background:#fff; }}
+                                .map-wrap img {{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }}
+                                #checkpoints-editor-layer {{ position:absolute; inset:0; z-index:6; pointer-events:none; }}
+                                #acessibilidade-editor-layer {{ position:absolute; inset:0; z-index:7; }}
+                                .checkpoint-editor {{ position:absolute; width:42px; height:42px; transform:translate(-50%, -100%); border-radius:50% 50% 50% 0; rotate:-45deg; background: radial-gradient(circle at 35% 35%, #eaf8ff, #93d9ff 62%, #5dbcf2); border:2px solid #2f8dc0; box-shadow: 0 8px 18px rgba(0,0,0,.26); display:flex; align-items:center; justify-content:center; opacity:.88; }}
+                                .checkpoint-editor span {{ transform: rotate(45deg); color:#0f4f70; font-family:"Baloo 2", sans-serif; font-size:.8rem; font-weight:800; margin-top:1px; }}
+                                .acess-marker {{ position:absolute; transform:translate(-50%, -100%); display:flex; flex-direction:column; align-items:center; gap:4px; cursor:grab; user-select:none; touch-action:none; }}
+                                .acess-marker:active {{ cursor:grabbing; }}
+                                .acess-pin {{ width:38px; height:38px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display:grid; place-items:center; font-size:16px; font-weight:900; background: var(--marker-fundo); color: var(--marker-cor); border:2px solid var(--marker-cor); box-shadow: 0 10px 18px rgba(0,0,0,.2); position:relative; }}
+                                .acess-pin span {{ transform: rotate(45deg); display:inline-block; }}
+                                .marker-list {{ display:grid; gap:8px; margin-top: 12px; }}
+                                .marker-item {{ display:flex; justify-content:space-between; align-items:center; gap:8px; border:1px solid #efbfd5; border-radius:12px; padding:10px 12px; }}
+                                .marker-actions {{ display:flex; gap:8px; }}
+                                .marker-actions button {{ min-height:32px; padding:0 10px; }}
+                                .hint {{ color:#7a3a5f; font-size:.92rem; line-height:1.35; }}
+                                .editor-legend {{ margin-top: 12px; display:grid; gap:8px; }}
+                                .editor-legend-item {{ display:flex; gap:10px; align-items:center; padding:8px 10px; border-radius:12px; background:#fff6fb; border:1px solid #efbfd5; }}
+                                @media (max-width: 900px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+                        </style>
+                </head>
+                <body>
+                        <div class="shell">
+                                <div class="header">
+                                        <h1>Editor de Acessibilidade</h1>
+                                        <a href="/da">Voltar ao D.A</a>
+                                </div>
+                                <div class="grid">
+                                        <div class="card">
+                                                <div class="toolbar">
+                                                        <div>
+                                                                <label for="tipo-marker">Tipo</label>
+                                                                <select id="tipo-marker">
+                                                                        <option value="rampa">Rampa</option>
+                                                                        <option value="escada">Escada</option>
+                                                                        <option value="elevador">Elevador</option>
+                                                                </select>
+                                                        </div>
+                                                        <div>
+                                                                <label for="bloco-marker">Bloco</label>
+                                                                <select id="bloco-marker">
+                                                                        <option value="">Sem bloco</option>
+                                                                        {blocos_options}
+                                                                </select>
+                                                        </div>
+                                                        <div>
+                                                                <label for="texto-marker">Observação</label>
+                                                                <input id="texto-marker" type="text" placeholder="Ex: entrada lateral / corredor principal" />
+                                                        </div>
+                                                        <button id="btn-adicionar-marker" type="button">Adicionar marcador</button>
+                                                        <button id="btn-salvar-marker" class="secondary" type="button">Salvar alterações</button>
+                                                        <div class="hint">Arraste os ícones no mapa e depois salve. Cada marcador representa uma rampa, escada ou elevador.</div>
+                                                </div>
+                                                <div class="marker-list" id="lista-marcadores"></div>
+                                                    <div class="editor-legend">
+                                                        <div class="editor-legend-item"><div class="acess-pin" style="background:#daf8df;color:#1f8b3b;border-color:#1f8b3b;"><span>↗</span></div>Rampa</div>
+                                                        <div class="editor-legend-item"><div class="acess-pin" style="background:#f7e3cb;color:#8b5a2b;border-color:#8b5a2b;"><span>🪜</span></div>Escada</div>
+                                                        <div class="editor-legend-item"><div class="acess-pin" style="background:#d9e9ff;color:#1f5aa8;border-color:#1f5aa8;"><span>⇅</span></div>Elevador</div>
+                                                    </div>
+                                        </div>
+                                        <div class="card">
+                                                <div class="map-wrap" id="mapa-editor-wrap">
+                                                        <img src="/static/mapa_poli_base.png" alt="Mapa do campus" />
+                                                    <div id="checkpoints-editor-layer"></div>
+                                                        <div id="acessibilidade-editor-layer">{marcadores_html}</div>
+                                                </div>
+                                        </div>
+                                </div>
+                        </div>
+                        <script>
+                        const locaisEditor = {{}};
+                        const markersLayer = document.getElementById('acessibilidade-editor-layer');
+                        const checkpointsEditorLayer = document.getElementById('checkpoints-editor-layer');
+                        const listaMarcadores = document.getElementById('lista-marcadores');
+                        const tipoMarker = document.getElementById('tipo-marker');
+                        const blocoMarker = document.getElementById('bloco-marker');
+                        const textoMarker = document.getElementById('texto-marker');
+                        const btnAdicionarMarker = document.getElementById('btn-adicionar-marker');
+                        const btnSalvarMarker = document.getElementById('btn-salvar-marker');
+                        const MAPA_EDITOR = document.getElementById('mapa-editor-wrap');
+                        let marcadores = {json.dumps(marcadores)};
+
+                        const CORES = {{
+                            rampa: {{ cor: '#1f8b3b', fundo: '#daf8df', icone: '↗' }},
+                            escada: {{ cor: '#8b5a2b', fundo: '#f7e3cb', icone: '🪜' }},
+                            elevador: {{ cor: '#1f5aa8', fundo: '#d9e9ff', icone: '⇅' }},
+                        }};
+
+                        function gerarId() {{
+                            return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+                        }}
+
+                        function normalizarNumero(v, min, max) {{
+                            return Math.max(min, Math.min(max, Number(v) || 0));
+                        }}
+
+                        function pontoInicialPorBloco(bloco) {{
+                            const id = (bloco || '').trim().toLowerCase();
+                            if (!id) return {{ x: 50, y: 50 }};
+                            const ref = locaisEditor[id];
+                            if (ref && typeof ref.x === 'number' && typeof ref.y === 'number') return {{ x: ref.x, y: ref.y }};
+                            return {{ x: 50, y: 50 }};
+                        }}
+
+                        function tipoConfig(tipo) {{
+                            return CORES[(tipo || 'rampa').toLowerCase()] || CORES.rampa;
+                        }}
+
+                        function abreviarLocalEditor(id) {{
+                            const mapa = {{ "entrada": "ENT", "estacionamento": "EST", "lanchonete": "LAN", "bloco a": "A", "bloco h": "H", "bloco g": "G", "bloco f": "F", "bloco b": "B", "da": "DA", "bloco i/k": "I/K", "bloco e": "E", "bloco d": "D", "bloco j": "J", "bloco c": "C" }};
+                            if (mapa[id]) return mapa[id];
+                            if ((id || '').startsWith('bloco ')) return id.replace('bloco ', '').trim().toUpperCase() || 'BLO';
+                            return String(id || '').slice(0, 3).toUpperCase();
+                        }}
+
+                        function renderizarCheckpointsEditor() {{
+                            if (!checkpointsEditorLayer) return;
+                            checkpointsEditorLayer.innerHTML = '';
+                            Object.entries(locaisEditor).forEach(([id, dados]) => {{
+                                if (!dados || typeof dados.x !== 'number' || typeof dados.y !== 'number') return;
+                                const ck = document.createElement('div');
+                                ck.className = 'checkpoint-editor';
+                                ck.style.left = `${{dados.x}}%`;
+                                ck.style.top = `${{dados.y}}%`;
+                                ck.innerHTML = `<span>${{abreviarLocalEditor(id)}}</span>`;
+                                checkpointsEditorLayer.appendChild(ck);
+                            }});
+                        }}
+
+                        function renderizarLista() {{
+                            listaMarcadores.innerHTML = '';
+                            if (!marcadores.length) {{
+                                listaMarcadores.innerHTML = '<div class="hint">Nenhum marcador ainda. Adicione rampas, escadas ou elevadores.</div>';
+                                return;
+                            }}
+                            marcadores.forEach((item, index) => {{
+                                const linha = document.createElement('div');
+                                linha.className = 'marker-item';
+                                linha.innerHTML = `<div><strong>${{(item.tipo || '').toUpperCase()}}</strong><br>${{(item.bloco || 'Sem bloco').toUpperCase()}}${{item.texto ? '<br><small>' + item.texto + '</small>' : ''}}</div>`;
+                                const acoes = document.createElement('div');
+                                acoes.className = 'marker-actions';
+                                const btnIr = document.createElement('button');
+                                btnIr.type = 'button';
+                                btnIr.className = 'secondary';
+                                btnIr.textContent = 'Ir';
+                                btnIr.addEventListener('click', () => {{
+                                    const el = markersLayer.querySelector(`[data-id="${{item.id}}"]`);
+                                    if (el) el.scrollIntoView({{ block: 'center', behavior: 'smooth' }});
+                                }});
+                                const btnRemover = document.createElement('button');
+                                btnRemover.type = 'button';
+                                btnRemover.className = 'secondary';
+                                btnRemover.textContent = 'Remover';
+                                btnRemover.addEventListener('click', () => {{
+                                    marcadores.splice(index, 1);
+                                    renderizarEditor();
+                                }});
+                                acoes.appendChild(btnIr);
+                                acoes.appendChild(btnRemover);
+                                linha.appendChild(acoes);
+                                listaMarcadores.appendChild(linha);
+                            }});
+                        }}
+
+                        function aplicarPosicao(el, item) {{
+                            el.style.left = `${{item.x}}%`;
+                            el.style.top = `${{item.y}}%`;
+                        }}
+
+                        function renderizarEditor() {{
+                            markersLayer.innerHTML = '';
+                            marcadores.forEach((item) => {{
+                                const cfg = tipoConfig(item.tipo);
+                                const el = document.createElement('div');
+                                el.className = 'acess-marker';
+                                el.dataset.id = item.id;
+                                el.dataset.tipo = item.tipo;
+                                el.style.setProperty('--marker-cor', cfg.cor);
+                                el.style.setProperty('--marker-fundo', cfg.fundo);
+                                el.title = `${{cfg.rotulo}}${{item.bloco ? ' • ' + item.bloco.toUpperCase() : ''}}${{item.texto ? ' • ' + item.texto : ''}}`;
+                                el.innerHTML = `<div class="acess-pin"><span>${{cfg.icone}}</span></div>`;
+                                aplicarPosicao(el, item);
+
+                                let drag = null;
+                                el.addEventListener('pointerdown', (ev) => {{
+                                    ev.preventDefault();
+                                    el.setPointerCapture(ev.pointerId);
+                                    const rect = MAPA_EDITOR.getBoundingClientRect();
+                                    drag = {{ x: item.x, y: item.y, offsetX: ev.clientX - rect.left, offsetY: ev.clientY - rect.top }};
+                                    el.style.zIndex = '20';
+                                }});
+                                el.addEventListener('pointermove', (ev) => {{
+                                    if (!drag) return;
+                                    const rect = MAPA_EDITOR.getBoundingClientRect();
+                                    const x = normalizarNumero(((ev.clientX - rect.left) / rect.width) * 100, 0, 100);
+                                    const y = normalizarNumero(((ev.clientY - rect.top) / rect.height) * 100, 0, 100);
+                                    item.x = x;
+                                    item.y = y;
+                                    aplicarPosicao(el, item);
+                                }});
+                                const finalizar = () => {{
+                                    if (!drag) return;
+                                    drag = null;
+                                    el.style.zIndex = '7';
+                                }};
+                                el.addEventListener('pointerup', finalizar);
+                                el.addEventListener('pointercancel', finalizar);
+                                el.addEventListener('dblclick', () => {{
+                                    marcadores = marcadores.filter((m) => m.id !== item.id);
+                                    renderizarEditor();
+                                }});
+                                markersLayer.appendChild(el);
+                            }});
+                            renderizarLista();
+                        }}
+
+                        function adicionarMarcador() {{
+                            const tipo = (tipoMarker.value || 'rampa').toLowerCase();
+                            const bloco = (blocoMarker.value || '').trim().toLowerCase();
+                            const pos = pontoInicialPorBloco(bloco);
+                            marcadores.push({{
+                                id: gerarId(),
+                                tipo,
+                                x: pos.x,
+                                y: pos.y,
+                                bloco,
+                                texto: (textoMarker.value || '').trim(),
+                                rotulo: tipoConfig(tipo).rotulo,
+                            }});
+                            textoMarker.value = '';
+                            renderizarEditor();
+                        }}
+
+                        async function salvarMarcadores() {{
+                            const resposta = await fetch('/api/acessibilidade', {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{ marcadores }}),
+                            }});
+                            const data = await resposta.json().catch(() => ({{}}));
+                            if (!resposta.ok || data.status === 'erro') {{
+                                alert('Nao foi possivel salvar agora.');
+                                return;
+                            }}
+                            alert('Marcadores salvos.');
+                        }}
+
+                        btnAdicionarMarker.addEventListener('click', adicionarMarcador);
+                        btnSalvarMarker.addEventListener('click', salvarMarcadores);
+                        (async () => {{
+                            try {{
+                                const res = await fetch('/api/locais');
+                                const data = await res.json();
+                                Object.assign(locaisEditor, data || {{}});
+                                renderizarCheckpointsEditor();
+                            }} catch (_) {{}}
+                            renderizarEditor();
+                        }})();
+                        </script>
+                </body>
+                </html>
+                """
+        )
 
 
 @app.post("/da/eventos")
@@ -1712,6 +2254,26 @@ async def salvar_rotas(payload: RotasPayload) -> dict[str, Any]:
     return {"status": "ok"}
 
 
+@app.get("/api/acessibilidade")
+async def listar_acessibilidade_api() -> list[dict[str, Any]]:
+    return carregar_acessibilidade()
+
+
+@app.post("/api/acessibilidade")
+async def salvar_acessibilidade_api(request: Request, payload: AcessibilidadePayload) -> dict[str, Any]:
+    if not _da_autenticado(request):
+        return {"status": "erro", "mensagem": "Nao autenticado"}
+
+    marcadores = []
+    for item in payload.marcadores:
+        marcador = normalizar_marcador_acessibilidade(item.model_dump())
+        if marcador:
+            marcadores.append(marcador)
+
+    salvar_acessibilidade(marcadores)
+    return {"status": "ok", "total": len(marcadores)}
+
+
 @app.post("/api/guiar")
 async def guiar_usuario(req: RequisicaoLocal) -> dict[str, Any]:
     destino_id = req.destino.lower().strip()
@@ -1769,6 +2331,15 @@ async def chat_veterano(req: RequisicaoChat) -> dict[str, Any]:
             "tipo": "lanche",
             "texto": texto,
             "animacao": metadados_animacao_para_texto(texto),
+        }
+
+    acessibilidade = encontrar_acessibilidade_por_pergunta(req.pergunta)
+    if acessibilidade:
+        return {
+            "status": "sucesso",
+            "tipo": "acessibilidade",
+            "texto": acessibilidade,
+            "animacao": metadados_animacao_para_texto(acessibilidade),
         }
 
     busca = buscar_destino_por_sala(req.pergunta)

@@ -20,7 +20,8 @@
       "Seja direto e natural.",
       "Se a pergunta for sobre localizacao, diga o bloco e convide a clicar no mapa."
     ],
-    "fallback": "Tenta me perguntar por bloco ou sala, tipo B01, K06 ou Biblioteca, que eu te guio rapidinho."
+    "fallback": "Tenta me perguntar por bloco ou sala, tipo B01, K06 ou Biblioteca, que eu te guio rapidinho.",
+    "fora_contexto": "Eu so consigo falar sobre a POLI U-P-E e o campus. Pergunta por bloco, sala ou servico da POLI que eu te ajudo."
   },
   "destino": {
     "objetivo": "Classificar a intencao da pergunta e inferir destino do campus.",
@@ -58,6 +59,112 @@
       "espaco maker"
     ]
   },
+  "acessibilidade": {
+    "objetivo": "Responder sobre rampas, escadas e elevadores da POLI com base nos pontos cadastrados.",
+    "regras": [
+      "Seja objetiva e clara.",
+      "Quando houver bloco informado, cite o bloco.",
+      "Se nao houver dado cadastrado, diga que ainda nao foi mapeado."
+    ],
+    "fallback": "Todos os blocos possuem escadas, nem todos possuem elevadores, e as rampas estao sendo construidas gradativamente.",
+    "geral": [
+      "Todos os blocos possuem escadas.",
+      "Nem todos os blocos possuem elevadores.",
+      "As rampas estao sendo construidas gradativamente."
+    ],
+    "rampa": [
+      "As rampas estao sendo construidas gradativamente na POLI."
+    ],
+    "escada": [
+      "Todos os blocos possuem escadas."
+    ],
+    "elevador": [
+      "Nem todos os blocos possuem elevadores."
+    ]
+  },
+  "acessibilidade_locais": [
+    {
+      "id": "3ffc5525-de5c-47ee-b42a-49601971a834",
+      "tipo": "rampa",
+      "x": 39.698722769164604,
+      "y": 48.35411316065799,
+      "bloco": "bloco i/k",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "f9251d97-7dab-4987-97ce-e1cbaaecefc5",
+      "tipo": "elevador",
+      "x": 47.884908897344424,
+      "y": 52.60674519687497,
+      "bloco": "bloco i/k",
+      "texto": "",
+      "rotulo": "Elevador"
+    },
+    {
+      "id": "74c3b35e-a4fe-4bcf-a64b-3d55a0488294",
+      "tipo": "rampa",
+      "x": 28.87147019276439,
+      "y": 60.120334680678155,
+      "bloco": "bloco a",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "426cabd0-cf81-4352-a1bb-9c61856df310",
+      "tipo": "rampa",
+      "x": 59.198398026788645,
+      "y": 51.191221917535465,
+      "bloco": "bloco i/k",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "8b111ddf-cd2d-40ee-96c6-5313f6e4897c",
+      "tipo": "rampa",
+      "x": 34.92883610765425,
+      "y": 62.154202176260185,
+      "bloco": "bloco h",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "d5715596-2e9f-4ac8-be1f-090411564936",
+      "tipo": "rampa",
+      "x": 77.28162935834617,
+      "y": 57.63735933522716,
+      "bloco": "bloco e",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "595e3859-1eb1-4583-a2df-083ca78ff1ee",
+      "tipo": "elevador",
+      "x": 59.86489612512904,
+      "y": 72.1866350115219,
+      "bloco": "bloco b",
+      "texto": "",
+      "rotulo": "Elevador"
+    },
+    {
+      "id": "dd74c000-85f0-4c0a-a536-7963443f5dc8",
+      "tipo": "rampa",
+      "x": 72.25670331611586,
+      "y": 75.60773552818398,
+      "bloco": "bloco j",
+      "texto": "",
+      "rotulo": "Rampa"
+    },
+    {
+      "id": "c92d373c-825f-432f-8dd6-1bf149607881",
+      "tipo": "rampa",
+      "x": 66.03533190710863,
+      "y": 53.598419785505754,
+      "bloco": "bloco e",
+      "texto": "",
+      "rotulo": "Rampa"
+    }
+  ],
   "locais_override": {
     "entrada": {
       "x": 36.76,
