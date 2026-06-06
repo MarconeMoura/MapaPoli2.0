@@ -5,6 +5,7 @@ import os
 import random
 import re
 import ssl
+import uuid
 import unicodedata
 import urllib.error
 import urllib.request
@@ -107,6 +108,13 @@ def carregar_config_polia() -> dict[str, Any]:
 
 
 POLIA_CONFIG = carregar_config_polia()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+EVENTOS_ARQUIVO = os.path.join(BASE_DIR, "eventos.json")
+EVENTOS_EMAILS_ARQUIVO = os.path.join(BASE_DIR, "eventos_emails.txt")
+CADASTRO_EMAILS_ARQUIVO = os.path.join(BASE_DIR, "cadastro_emails.txt")
+DA_EVENTOS_ATIVO = os.getenv("DA_EVENTOS_ATIVO", "1").strip() != "0"
 
 
 def resolver_diretorio_static() -> str:
@@ -1162,6 +1170,155 @@ def salvar_config_polia(nova_config: dict[str, Any]) -> None:
         json.dump(nova_config, f, ensure_ascii=False, indent=2)
 
 
+def carregar_eventos() -> list[dict[str, Any]]:
+    if not os.path.exists(EVENTOS_ARQUIVO):
+        return []
+    try:
+        with open(EVENTOS_ARQUIVO, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return [e for e in data if isinstance(e, dict)]
+    except Exception as e:
+        print(f"Aviso: falha ao ler {EVENTOS_ARQUIVO}: {e}")
+    return []
+
+
+def salvar_eventos(eventos: list[dict[str, Any]]) -> None:
+    with open(EVENTOS_ARQUIVO, "w", encoding="utf-8") as f:
+        json.dump(eventos, f, ensure_ascii=False, indent=2)
+
+
+def registrar_email_evento(email: str, titulo: str, blocos: list[str], sala: str, campus_inteiro: bool) -> None:
+    linha = " | ".join(
+        [
+            f"email={email}",
+            f"titulo={titulo}",
+            f"blocos={', '.join(blocos) if blocos else ('campus inteiro' if campus_inteiro else '')}",
+            f"sala={sala}",
+        ]
+    ).strip()
+    with open(EVENTOS_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
+        f.write(linha + "\n")
+
+
+def registrar_email_cadastro(email: str) -> None:
+    email_limpo = (email or "").strip()
+    if not email_limpo:
+        return
+    with open(CADASTRO_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
+        f.write(email_limpo + "\n")
+
+
+def resolver_bloco_id(texto: str) -> str | None:
+    texto_norm = normalizar_texto(texto)
+    if not texto_norm:
+        return None
+    if texto_norm.startswith("bloco "):
+        return texto_norm if texto_norm in locais_campus else None
+    if len(texto_norm) == 1 and texto_norm.isalpha():
+        return aliases_blocos.get(texto_norm)
+    return None
+
+
+def resolver_blocos_ids(blocos_raw: list[str]) -> list[str]:
+    blocos: list[str] = []
+    for item in blocos_raw or []:
+        bloco_id = resolver_bloco_id(item)
+        if bloco_id and bloco_id not in blocos:
+            blocos.append(bloco_id)
+    return blocos
+
+
+def normalizar_blocos_evento(evento: dict[str, Any]) -> list[str]:
+    blocos = evento.get("blocos")
+    if isinstance(blocos, list) and blocos:
+        return [str(b).strip() for b in blocos if str(b).strip()]
+    bloco_legado = str(evento.get("bloco") or "").strip()
+    if bloco_legado:
+        return [bloco_legado]
+    return []
+
+
+def formatar_blocos_evento(evento: dict[str, Any]) -> str:
+    blocos = normalizar_blocos_evento(evento)
+    if "campus" in [b.lower() for b in blocos]:
+        return "CAMPUS INTEIRO"
+    return ", ".join([b.upper() for b in blocos]) if blocos else "LOCAL NAO INFORMADO"
+
+
+def adicionar_evento(titulo: str, email: str, blocos_raw: list[str], sala: str, campus_inteiro: bool) -> tuple[bool, str]:
+    titulo = (titulo or "").strip()
+    email = (email or "").strip()
+    sala = (sala or "").strip()
+    if not titulo:
+        return False, "Titulo e obrigatorio."
+    if not email or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+        return False, "Email valido e obrigatorio."
+
+    blocos = [] if campus_inteiro else resolver_blocos_ids(blocos_raw)
+    if not campus_inteiro and not blocos:
+        return False, "Selecione pelo menos um bloco ou marque campus inteiro."
+
+    eventos = carregar_eventos()
+    eventos.append(
+        {
+            "id": uuid.uuid4().hex,
+            "titulo": titulo,
+            "email": email,
+            "blocos": ["campus"] if campus_inteiro else blocos,
+            "sala": sala,
+        }
+    )
+    salvar_eventos(eventos)
+    registrar_email_evento(email, titulo, blocos, sala, campus_inteiro)
+    return True, "Evento salvo."
+
+
+def remover_evento(evento_id: str) -> bool:
+    if not evento_id:
+        return False
+    eventos = carregar_eventos()
+    restantes = [e for e in eventos if str(e.get("id") or "") != evento_id]
+    if len(restantes) == len(eventos):
+        return False
+    salvar_eventos(restantes)
+    return True
+
+
+def encontrar_evento_por_pergunta(pergunta: str) -> dict[str, Any] | None:
+    eventos = carregar_eventos()
+    if not eventos:
+        return None
+    pergunta_norm = normalizar_texto(pergunta)
+    if not pergunta_norm:
+        return None
+
+    melhor: tuple[int, dict[str, Any]] | None = None
+    for evento in eventos:
+        titulo = str(evento.get("titulo") or "").strip()
+        titulo_norm = normalizar_texto(titulo)
+        if not titulo_norm:
+            continue
+        if titulo_norm in pergunta_norm:
+            score = len(titulo_norm)
+            if not melhor or score > melhor[0]:
+                melhor = (score, evento)
+
+    if melhor:
+        return melhor[1]
+
+    melhor_fuzzy: tuple[float, dict[str, Any]] | None = None
+    for evento in eventos:
+        titulo = str(evento.get("titulo") or "").strip()
+        titulo_norm = normalizar_texto(titulo)
+        if len(titulo_norm) < 4:
+            continue
+        score = SequenceMatcher(None, pergunta_norm, titulo_norm).ratio()
+        if score >= 0.86 and (not melhor_fuzzy or score > melhor_fuzzy[0]):
+            melhor_fuzzy = (score, evento)
+    return melhor_fuzzy[1] if melhor_fuzzy else None
+
+
 def _da_config_valida() -> bool:
     return bool(DA_USER and DA_PASSWORD)
 
@@ -1362,40 +1519,116 @@ async def autenticar_da(usuario: str = Form(...), senha: str = Form(...)):
 
 @app.get("/da", response_class=HTMLResponse)
 async def pagina_da(request: Request) -> HTMLResponse:
-        if not _da_autenticado(request):
-                return RedirectResponse(url="/da/login", status_code=302)
+    if not _da_autenticado(request):
+        return RedirectResponse(url="/da/login", status_code=302)
 
-        return HTMLResponse(
-                """
-                <!DOCTYPE html>
-                <html lang="pt-br">
-                <head>
-                    <meta charset="UTF-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1" />
-                    <title>D.A - Diretório Acadêmico</title>
-                    <style>
-                        body { font-family: "Nunito", "Segoe UI", sans-serif; margin: 0; background: #ffeaf6; color: #5b1b3f; }
-                        header { padding: 18px 20px; background: #c94887; color: #fff; display: flex; justify-content: space-between; align-items: center; }
-                        header h1 { margin: 0; font-family: "Baloo 2", sans-serif; font-size: 1.4rem; }
-                        header a { color: #fff; text-decoration: none; font-weight: 700; }
-                        main { padding: 18px 20px; }
-                        .card { background: #fff; border: 2px solid #d98ab2; border-radius: 16px; padding: 18px; box-shadow: 0 12px 20px rgba(117, 25, 74, 0.18); }
-                    </style>
-                </head>
-                <body>
-                    <header>
-                        <h1>Diretório Acadêmico</h1>
-                        <a href="/da/logout">Sair</a>
-                    </header>
-                    <main>
-                        <div class="card">
-                            <p>Conteúdo privado do D.A. Pode atualizar este bloco com comunicados e links internos.</p>
-                        </div>
-                    </main>
-                </body>
-                </html>
-                """
+    eventos_html = ""
+    blocos_html = ""
+    if DA_EVENTOS_ATIVO:
+        eventos = carregar_eventos()
+        eventos_html = "".join(
+            [
+                f"<li><strong>{e.get('titulo','')}</strong> — {formatar_blocos_evento(e)}"
+                f"{(' / ' + e.get('sala','')) if e.get('sala') else ''}"
+                f" <form method=\"post\" action=\"/da/eventos/remover\" style=\"display:inline; margin-left: 8px;\">"
+                f"<input type=\"hidden\" name=\"evento_id\" value=\"{e.get('id','')}\" />"
+                f"<button type=\"submit\" style=\"padding: 4px 8px; border-radius: 10px; border: 1px solid #d98ab2;\">Remover</button>"
+                f"</form></li>"
+                for e in eventos
+            ]
+        ) or "<li>Nenhum evento cadastrado.</li>"
+
+        blocos_html = "".join(
+            [
+                f"<label style=\"display:flex; align-items:center; gap:8px;\">"
+                f"<input type=\"checkbox\" name=\"blocos\" value=\"{bid}\" />"
+                f"{bid.upper()}</label>"
+                for bid in sorted([b for b in locais_campus.keys() if b.startswith("bloco ")])
+            ]
         )
+
+    return HTMLResponse(
+        """
+        <!DOCTYPE html>
+        <html lang="pt-br">
+        <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>D.A - Diretório Acadêmico</title>
+            <style>
+                body { font-family: "Nunito", "Segoe UI", sans-serif; margin: 0; background: #ffeaf6; color: #5b1b3f; }
+                header { padding: 18px 20px; background: #c94887; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+                header h1 { margin: 0; font-family: "Baloo 2", sans-serif; font-size: 1.4rem; }
+                header a { color: #fff; text-decoration: none; font-weight: 700; }
+                header .actions { display: flex; gap: 12px; align-items: center; }
+                main { padding: 18px 20px; }
+                .card { background: #fff; border: 2px solid #d98ab2; border-radius: 16px; padding: 18px; box-shadow: 0 12px 20px rgba(117, 25, 74, 0.18); }
+            </style>
+        </head>
+        <body>
+            <header>
+                <h1>Diretório Acadêmico</h1>
+                <div class="actions">
+                    <a href="/">Mapa</a>
+                    <a href="/da/logout">Sair</a>
+                </div>
+            </header>
+            <main>
+                <div class="card">
+                    <p>Conteúdo privado do D.A. Pode atualizar este bloco com comunicados e links internos.</p>
+                </div>
+                {eventos_panel}
+            </main>
+        </body>
+        </html>
+        """
+        .replace(
+            "{eventos_panel}",
+            (
+                """
+                <div class=\"card\" style=\"margin-top: 18px;\">
+                    <h2 style=\"margin: 0 0 10px;\">Eventos do campus</h2>
+                    <p style=\"margin-top: 0;\">Cadastre eventos para a Polia informar onde acontecem. O email do responsavel e obrigatorio.</p>
+                    <form method=\"post\" action=\"/da/eventos\" style=\"display: grid; gap: 12px;\">
+                        <div>
+                            <label for=\"titulo\" style=\"font-weight: 700;\">Titulo do evento</label>
+                            <input id=\"titulo\" name=\"titulo\" type=\"text\" required />
+                        </div>
+                        <div>
+                            <label for=\"email\" style=\"font-weight: 700;\">Email do responsavel</label>
+                            <input id=\"email\" name=\"email\" type=\"email\" required placeholder=\"nome@exemplo.com\" />
+                        </div>
+                        <div>
+                            <label style=\"font-weight: 700;\">Cobertura</label>
+                            <label style=\"display:flex; align-items:center; gap:8px; margin-top: 6px;\">
+                                <input type=\"checkbox\" name=\"campus_inteiro\" value=\"1\" />
+                                Campus inteiro
+                            </label>
+                        </div>
+                        <div>
+                            <label style=\"font-weight: 700;\">Blocos (selecione um ou mais)</label>
+                            <div style=\"display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin-top: 6px;\">
+                                {blocos_html}
+                            </div>
+                        </div>
+                        <div>
+                            <label for=\"sala\" style=\"font-weight: 700;\">Sala/area (opcional)</label>
+                            <input id=\"sala\" name=\"sala\" type=\"text\" placeholder=\"Ex: Auditorio, Laboratorio 1\" />
+                        </div>
+                        <button type=\"submit\" style=\"margin-top: 6px;\">Salvar evento</button>
+                    </form>
+                    <h3 style=\"margin: 16px 0 8px;\">Eventos cadastrados</h3>
+                    <ul style=\"margin: 0; padding-left: 18px;\">
+                        {eventos_html}
+                    </ul>
+                    <p style=\"margin: 14px 0 0; font-size: 0.92rem; color: #7a3a5f;\">Os emails enviados ficam registrados em eventos_emails.txt.</p>
+                </div>
+                """.replace("{eventos_html}", eventos_html).replace("{blocos_html}", blocos_html)
+                if DA_EVENTOS_ATIVO
+                else ""
+            ),
+        )
+    )
 
 
 @app.get("/da/logout")
@@ -1403,6 +1636,52 @@ async def sair_da() -> RedirectResponse:
         resposta = RedirectResponse(url="/da/login", status_code=302)
         resposta.delete_cookie(DA_COOKIE_NAME)
         return resposta
+
+
+@app.post("/da/eventos")
+async def salvar_evento_da(
+    request: Request,
+    titulo: str = Form(...),
+    email: str = Form(...),
+    blocos: list[str] = Form([]),
+    sala: str = Form(""),
+    campus_inteiro: str = Form(""),
+):
+    if not _da_autenticado(request):
+        return RedirectResponse(url="/da/login", status_code=302)
+
+    if not DA_EVENTOS_ATIVO:
+        return HTMLResponse(
+            "<h1>Eventos desativados</h1><p>Esta funcionalidade esta desligada.</p><p><a href=\"/da\">Voltar</a></p>",
+            status_code=404,
+        )
+
+    ok, msg = adicionar_evento(titulo, email, blocos, sala, bool(campus_inteiro))
+    if not ok:
+        return HTMLResponse(
+            f"<h1>Erro ao salvar evento</h1><p>{msg}</p><p><a href=\"/da\">Voltar</a></p>",
+            status_code=400,
+        )
+    return RedirectResponse(url="/da", status_code=302)
+
+
+@app.post("/da/eventos/remover")
+async def remover_evento_da(request: Request, evento_id: str = Form("")):
+    if not _da_autenticado(request):
+        return RedirectResponse(url="/da/login", status_code=302)
+
+    if not DA_EVENTOS_ATIVO:
+        return HTMLResponse(
+            "<h1>Eventos desativados</h1><p>Esta funcionalidade esta desligada.</p><p><a href=\"/da\">Voltar</a></p>",
+            status_code=404,
+        )
+
+    if not remover_evento(evento_id):
+        return HTMLResponse(
+            "<h1>Evento nao encontrado</h1><p><a href=\"/da\">Voltar</a></p>",
+            status_code=404,
+        )
+    return RedirectResponse(url="/da", status_code=302)
 
 
 @app.get("/api/locais")
@@ -1505,6 +1784,26 @@ async def chat_veterano(req: RequisicaoChat) -> dict[str, Any]:
             "animacao": metadados_animacao_para_texto(texto),
         }
 
+    evento = encontrar_evento_por_pergunta(req.pergunta) if DA_EVENTOS_ATIVO else None
+    if evento:
+        titulo = str(evento.get("titulo") or "").strip()
+        blocos = normalizar_blocos_evento(evento)
+        sala = str(evento.get("sala") or "").strip()
+        campus_inteiro = "campus" in [b.lower() for b in blocos]
+        if campus_inteiro:
+            texto = f"O evento {titulo} acontece no campus inteiro."
+        elif sala:
+            texto = f"O evento {titulo} acontece no {', '.join([b.upper() for b in blocos])}, sala {sala}."
+        else:
+            texto = f"O evento {titulo} acontece no {', '.join([b.upper() for b in blocos])}."
+        return {
+            "status": "sucesso",
+            "tipo": "evento",
+            "destino": blocos[0] if blocos else "",
+            "texto": texto,
+            "animacao": metadados_animacao_para_texto(texto),
+        }
+
     inferencia_ia = await inferir_destino_com_ia(req.pergunta, contexto_extra=req.contexto_extra)
     if inferencia_ia:
         destino = inferencia_ia["destino"]
@@ -1591,6 +1890,22 @@ async def avatar_config() -> dict[str, Any]:
             "max_frames_sequencia": 160,
         },
     }
+
+
+class CadastroEmailPayload(BaseModel):
+    email: str
+
+
+@app.post("/api/cadastro-email")
+async def registrar_cadastro_email(payload: CadastroEmailPayload) -> dict[str, str]:
+    email = (payload.email or "").strip()
+    if not email or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+        return {"status": "erro", "mensagem": "Email invalido"}
+
+    with open(CADASTRO_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
+        f.write(email + "\n")
+
+    return {"status": "ok"}
 
 
 def gerar_audio_openai(texto: str) -> bytes | None:

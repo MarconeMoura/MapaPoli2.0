@@ -679,12 +679,8 @@ body { padding: 8px; }
 <form id="cadastro-form">
 <div id="cadastro-step-1" class="cadastro-step is-active">
 <div class="cadastro-field">
-<label>Você tem e-mail institucional?</label>
-<div class="cadastro-opcoes">
-<label><input type="radio" name="emailStatus" value="nao_quero" checked> Não quero informar ou não tenho</label>
-<label><input type="radio" name="emailStatus" value="sim"> Sim, meu e-mail é:</label>
-</div>
-<input id="cadastro-email" type="email" placeholder="Ex: seu.nome@upe.br" disabled />
+<label for="cadastro-email">E-mail</label>
+<input id="cadastro-email" type="email" placeholder="Ex: seu.nome@upe.br" required />
 </div>
 <div class="audio-gate-actions">
 <button id="cadastro-avancar" type="button">Continuar</button>
@@ -1877,7 +1873,6 @@ function montarContextoPerfil() {
     email: perfilUsuario.email || "",
     curso: perfilUsuario.curso || "",
     funcao: perfilUsuario.funcao || "",
-    email_status: perfilUsuario.emailStatus || "",
   };
 }
 
@@ -2111,14 +2106,42 @@ const cursoSelect = document.getElementById('cadastro-curso');
 const funcaoField = document.getElementById('cadastro-funcao-field');
 const funcaoInput = document.getElementById('cadastro-funcao');
 
-const atualizarEmailInput = () => {
-  const selecionado = document.querySelector('input[name="emailStatus"]:checked');
-  const temEmail = selecionado && selecionado.value === 'sim';
-  if (emailInput) {
-    emailInput.disabled = !temEmail;
-    if (!temEmail) emailInput.value = '';
+async function registrarEmailCadastro(email) {
+  const emailLimpo = (email || '').trim();
+  if (!emailLimpo) return false;
+  try {
+    const payload = JSON.stringify({ email: emailLimpo });
+    if (navigator.sendBeacon) {
+      const enviado = navigator.sendBeacon('/api/cadastro-email', new Blob([payload], { type: 'application/json' }));
+      if (enviado) return true;
+    }
+    const resposta = await fetch('/api/cadastro-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    });
+    return resposta.ok;
+  } catch (_) {
+    return false;
   }
-};
+}
+
+async function avancarCadastro() {
+  const email = (emailInput?.value || '').trim();
+  if (!email || !emailInput?.checkValidity()) {
+    if (emailInput) emailInput.reportValidity();
+    return false;
+  }
+  const registrado = await registrarEmailCadastro(email);
+  if (!registrado) {
+    alert('Nao foi possivel registrar seu e-mail agora. Tente novamente.');
+    return false;
+  }
+  if (step1) step1.classList.remove('is-active');
+  if (step2) step2.classList.add('is-active');
+  return true;
+}
 
 const atualizarFuncao = () => {
   if (!cursoSelect || !funcaoField) return;
@@ -2127,18 +2150,13 @@ const atualizarFuncao = () => {
   if (!mostrar && funcaoInput) funcaoInput.value = '';
 };
 
-document.querySelectorAll('input[name="emailStatus"]').forEach((radio) => {
-  radio.addEventListener('change', atualizarEmailInput);
-});
-
 if (cursoSelect) {
   cursoSelect.addEventListener('change', atualizarFuncao);
 }
 
 if (btnAvancar) {
-  btnAvancar.addEventListener('click', () => {
-    if (step1) step1.classList.remove('is-active');
-    if (step2) step2.classList.add('is-active');
+  btnAvancar.addEventListener('click', async () => {
+    await avancarCadastro();
   });
 }
 
@@ -2162,7 +2180,6 @@ if (btnLimpar) {
     if (nomeInput) nomeInput.value = '';
     if (cursoSelect) cursoSelect.value = '';
     if (funcaoInput) funcaoInput.value = '';
-    atualizarEmailInput();
     atualizarFuncao();
   });
 }
@@ -2170,10 +2187,13 @@ if (btnLimpar) {
 if (cadastroForm) {
   cadastroForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const emailStatus = document.querySelector('input[name="emailStatus"]:checked')?.value || 'nao_quero';
+    if (step1 && step1.classList.contains('is-active')) {
+      avancarCadastro();
+      return;
+    }
+    const email = (emailInput?.value || '').trim();
     perfilUsuario = {
-      emailStatus,
-      email: emailStatus === 'sim' ? (emailInput?.value || '').trim() : '',
+      email,
       nome: (nomeInput?.value || '').trim(),
       curso: cursoSelect?.value || '',
       funcao: funcaoInput?.value || '',
@@ -2193,9 +2213,6 @@ if (cadastroForm) {
 const perfilSalvo = carregarPerfilCookie();
 if (perfilSalvo) {
   perfilUsuario = perfilSalvo;
-  const emailStatus = perfilSalvo.emailStatus || 'nao_quero';
-  const radio = document.querySelector(`input[name="emailStatus"][value="${emailStatus}"]`);
-  if (radio) radio.checked = true;
   if (emailInput) {
     emailInput.value = perfilSalvo.email || '';
   }
@@ -2213,7 +2230,6 @@ if (perfilSalvo) {
   if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'false');
 }
 
-atualizarEmailInput();
 atualizarFuncao();
 
 carregarLocais();
