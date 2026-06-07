@@ -1305,7 +1305,29 @@ def normalizar_marcador_acessibilidade(item: Any) -> dict[str, Any] | None:
         return None
     bloco = str(item.get("bloco") or "").strip().lower()
     if bloco and bloco not in locais_campus:
-        bloco = ""
+        # tenta mapear nomes de salas (ex: 'biblioteca') para o bloco pai
+        bloco_norm = normalizar_texto(bloco)
+        encontrado = None
+        for destino, dados in locais_campus.items():
+            salas = dados.get("salas") or []
+            for sala in salas:
+                sala_norm = normalizar_texto(str(sala))
+                if not sala_norm:
+                    continue
+                for token in sala_norm.split():
+                    if len(token) <= 1:
+                        continue
+                    if token == bloco_norm or bloco_norm in token or token in bloco_norm:
+                        encontrado = destino
+                        break
+                if encontrado:
+                    break
+            if encontrado:
+                break
+        if encontrado:
+            bloco = encontrado
+        else:
+            bloco = ""
     texto = str(item.get("texto") or "").strip()
     rotulo = str(item.get("rotulo") or "").strip() or ACESSIBILIDADE_TIPOS[tipo]["rotulo"]
     return {
@@ -1353,7 +1375,7 @@ def formatar_marcador_acessibilidade(item: dict[str, Any]) -> str:
 
 
 def extrair_tipo_acessibilidade_pergunta(texto_norm: str) -> str | None:
-    for tipo in ("elevador", "escada", "rampa"):
+    for tipo in ("elevador", "escada", "rampa", "banheiro"):
         if tipo in texto_norm:
             return tipo
     return None
@@ -1362,10 +1384,21 @@ def extrair_tipo_acessibilidade_pergunta(texto_norm: str) -> str | None:
 def extrair_blocos_acessibilidade_pergunta(texto_norm: str) -> list[str]:
     blocos: list[str] = []
 
-    for destino in locais_campus:
+    # detecta blocos pelo proprio nome do destino
+    for destino, dados in locais_campus.items():
         nome_norm = normalizar_texto(destino)
         if nome_norm and len(nome_norm) > 2 and re.search(rf"\b{re.escape(nome_norm)}\b", texto_norm):
             blocos.append(destino)
+        # detecta salas/locais listados dentro do bloco (ex: 'biblioteca' pertence ao bloco H)
+        salas = dados.get("salas") or []
+        for sala in salas:
+            sala_norm = normalizar_texto(str(sala))
+            if not sala_norm:
+                continue
+            for token in sala_norm.split():
+                if len(token) > 1 and re.search(rf"\b{re.escape(token)}\b", texto_norm):
+                    blocos.append(destino)
+                    break
 
     for match in re.finditer(r"\bbloco\s+([a-z])\b", texto_norm):
         bloco = aliases_blocos.get(match.group(1))
@@ -1384,6 +1417,14 @@ def responder_acessibilidade_por_bloco(
     marcadores: list[dict[str, Any]],
     acess_cfg: dict[str, Any],
 ) -> str | None:
+    # tratamento especial para perguntas sobre banheiros
+    if tipo == "banheiro":
+        if blocos_pedidos:
+            return f"Sim. Há banheiros acessíveis {formatar_blocos_acessibilidade(blocos_pedidos)}."
+        geral = acess_cfg.get("banheiro") or []
+        if isinstance(geral, list) and geral:
+            return str(geral[0])
+        return "Quase todos os banheiros possuem adaptações de acessibilidade, inclusive o da lanchonete."
     if tipo == "elevador":
         rotulo_plural = "elevadores"
     elif tipo == "escada":
@@ -1463,6 +1504,13 @@ def encontrar_acessibilidade_por_pergunta(pergunta: str) -> str | None:
         resposta_direta = responder_acessibilidade_por_bloco(tipo_pedido, blocos_pedidos, marcadores, acess_cfg)
         if resposta_direta:
             return resposta_direta
+
+    # consultas gerais sobre banheiros sem bloco/verbos diretos
+    if tipo_pedido == "banheiro":
+        geral = acess_cfg.get("banheiro") or []
+        if isinstance(geral, list) and geral:
+            return str(geral[0])
+        return "Quase todos os banheiros possuem adaptações de acessibilidade, inclusive o da lanchonete."
 
     consulta_geral = bool(re.search(r"\b(acessibilidade|acessivel|pcd|cadeirante|mobilidade)\b", texto_norm))
     if consulta_geral and not any(tipo in texto_norm for tipo in ACESSIBILIDADE_TIPOS):
@@ -1716,7 +1764,7 @@ async def pagina_login_da() -> str:
         if not _da_config_valida():
                 return """
                 <h1>Configuração do D.A ausente</h1>
-                <p>Defina as variáveis de ambiente <strong>DA_USER</strong> e <strong>DA_PASSWORD</strong>.</p>
+         if tipo == "escada" or tipo == "elevador":
                 """
 
         return """
