@@ -2394,10 +2394,11 @@ if (perfilSalvo) {
   if (funcaoInput) {
     funcaoInput.value = perfilSalvo.funcao || '';
   }
-  if (step1) step1.classList.remove('is-active');
-  if (step2) step2.classList.add('is-active');
-  if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'false');
 }
+
+if (step2) step2.classList.remove('is-active');
+if (step1) step1.classList.add('is-active');
+if (cadastroGate) cadastroGate.setAttribute('aria-hidden', 'false');
 
 atualizarFuncao();
 
