@@ -6,6 +6,7 @@ import os
 import random
 import re
 import ssl
+import sqlite3
 import uuid
 import unicodedata
 import urllib.error
@@ -139,6 +140,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EVENTOS_ARQUIVO = os.path.join(BASE_DIR, "eventos.json")
 EVENTOS_EMAILS_ARQUIVO = os.path.join(BASE_DIR, "eventos_emails.txt")
 CADASTRO_EMAILS_ARQUIVO = os.path.join(BASE_DIR, "cadastro_emails.txt")
+CADASTRO_EMAILS_DB = os.path.join(BASE_DIR, "cadastro_emails.sqlite3")
 DA_EVENTOS_ATIVO = os.getenv("DA_EVENTOS_ATIVO", "1").strip() != "0"
 
 
@@ -1244,8 +1246,72 @@ def registrar_email_cadastro(email: str) -> None:
     email_limpo = (email or "").strip()
     if not email_limpo:
         return
-    with open(CADASTRO_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
-        f.write(email_limpo + "\n")
+    conexao = sqlite3.connect(CADASTRO_EMAILS_DB)
+    try:
+        conexao.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cadastro_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conexao.execute("INSERT INTO cadastro_emails (email) VALUES (?)", (email_limpo,))
+        conexao.commit()
+    finally:
+        conexao.close()
+
+
+def _importar_cadastro_emails_txt_para_sqlite() -> None:
+    if not os.path.exists(CADASTRO_EMAILS_ARQUIVO):
+        return
+    conexao = sqlite3.connect(CADASTRO_EMAILS_DB)
+    try:
+        conexao.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cadastro_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        existentes = {
+            linha[0].strip().lower()
+            for linha in conexao.execute("SELECT email FROM cadastro_emails")
+            if linha and linha[0]
+        }
+        with open(CADASTRO_EMAILS_ARQUIVO, "r", encoding="utf-8") as f:
+            for linha in f:
+                email = linha.strip()
+                if email and email.lower() not in existentes:
+                    conexao.execute("INSERT INTO cadastro_emails (email) VALUES (?)", (email,))
+                    existentes.add(email.lower())
+        conexao.commit()
+    finally:
+        conexao.close()
+
+
+def garantir_banco_cadastro_emails() -> None:
+    conexao = sqlite3.connect(CADASTRO_EMAILS_DB)
+    try:
+        conexao.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cadastro_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conexao.commit()
+    finally:
+        conexao.close()
+    _importar_cadastro_emails_txt_para_sqlite()
+
+
+garantir_banco_cadastro_emails()
 
 
 ACESSIBILIDADE_TIPOS = {
@@ -1968,7 +2034,7 @@ async def pagina_da(request: Request) -> HTMLResponse:
                 <div class="actions">
                     <a href="/">Mapa</a>
                     <a href="/da/acessibilidade">Acessibilidade</a>
-                    <a href="/da/cadastros/emails/download">Baixar emails</a>
+                    <a href="/da/cadastros/emails/download">Baixar banco de emails</a>
                     <a href="/da/logout">Sair</a>
                 </div>
             </header>
@@ -2042,11 +2108,10 @@ async def baixar_emails_cadastro(request: Request):
     if not _da_autenticado(request):
         return RedirectResponse(url="/da/login", status_code=302)
 
-    garantir_arquivo_texto(CADASTRO_EMAILS_ARQUIVO)
     return FileResponse(
-        CADASTRO_EMAILS_ARQUIVO,
-        media_type="text/plain; charset=utf-8",
-        filename="cadastro_emails.txt",
+        CADASTRO_EMAILS_DB,
+        media_type="application/octet-stream",
+        filename="cadastro_emails.sqlite3",
     )
 
 
@@ -2641,8 +2706,7 @@ async def registrar_cadastro_email(payload: CadastroEmailPayload) -> dict[str, s
     if not email or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
         return {"status": "erro", "mensagem": "Email invalido"}
 
-    with open(CADASTRO_EMAILS_ARQUIVO, "a", encoding="utf-8") as f:
-        f.write(email + "\n")
+    registrar_email_cadastro(email)
 
     return {"status": "ok"}
 
